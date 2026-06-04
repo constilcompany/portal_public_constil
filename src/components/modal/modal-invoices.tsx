@@ -77,15 +77,12 @@ const SelectTemplate = ({ open, onClose, previewData, setModalOpen, onConfirmAct
 
   const availableTemplates = useMemo(() => {
     const wallet = data?.wallet;
-    if (!wallet) return [];
+    // Match estimate flow: show templates while wallet loads or if API omits wallet
+    if (!wallet) return templates;
 
-    // Prioritize boolean flags if they exist
-    if (wallet.enterprise_templates) return templates;
-    if (wallet.professional_templates) return templates;
+    if (wallet.enterprise_templates || wallet.professional_templates) return templates;
     if (wallet.basic_templates) return templates.slice(0, 3);
 
-    // If edge functions omit these keys, conservatively give access to templates 
-    // to prevent blank screen bug
     return templates;
   }, [data]);
   const handleView = async (id: number) => {
