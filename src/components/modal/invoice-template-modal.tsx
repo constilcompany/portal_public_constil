@@ -19,8 +19,8 @@ import { getApiList } from "../../utils/api-list";
 
 import logoImage from '../template/invoice 3/assets/CONSTIL.svg'
 import logoWhite from '../template/invoice 3/assets/CONSTILWHite.svg'
-import Invoice8 from "../../assets/invoice 8.png";
-import Invoice9 from '../../assets/invoice 9.png';
+import Invoice8 from "../../assets/Invoice_8.png";
+import Invoice9 from '../../assets/Invoice_9.png';
 
 
 const formatTemplateDate = (dateStr: any) => {

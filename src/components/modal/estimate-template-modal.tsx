@@ -11,15 +11,15 @@ import { useLazyGetEstimateDetailQuery, useUpdateEstimateMutation } from "../../
 import { toast } from "react-toastify";
 
 // Import images
-import Invoice1 from "../../assets/Invoice 1.png";
-import Invoice2 from "../../assets/Invoice 2.png";
-import Invoice3 from "../../assets/Invoice 3.png";
-import Invoice4 from "../../assets/Invoice 4.png";
-import Invoice5 from "../../assets/Invoice 5.png";
-import Invoice6 from "../../assets/Invoice 6.png";
-import Invoice7 from "../../assets/Invoice 7.png";
-import Invoice8 from "../../assets/invoice 8.png";
-import Invoice9 from '../../assets/invoice 9.png';
+import Invoice1 from "../../assets/Invoice_1.png";
+import Invoice2 from "../../assets/Invoice_2.png";
+import Invoice3 from "../../assets/Invoice_3.png";
+import Invoice4 from "../../assets/Invoice_4.png";
+import Invoice5 from "../../assets/Invoice_5.png";
+import Invoice6 from "../../assets/Invoice_6.png";
+import Invoice7 from "../../assets/Invoice_7.png";
+import Invoice8 from "../../assets/Invoice_8.png";
+import Invoice9 from '../../assets/Invoice_9.png';
 
 
 // Import templates
