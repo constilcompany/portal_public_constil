@@ -7,10 +7,17 @@ import { S3UploadService } from "../../components/data/s3-data";
 import { TemplateModalShell } from "./template-modal-shell";
 import { TemplatePickerGallery } from "./template-picker-gallery";
 import { TemplatePreviewToolbar } from "./template-preview-toolbar";
-import { useLazyGetEstimateDetailQuery, useUpdateEstimateMutation } from "../../services/rtkapi/invoiceApi";
+import { useLazyGetEstimateDetailQuery, useUpdateEstimateMutation, useGetTaxesQuery, useGetDiscountsQuery } from "../../services/rtkapi/invoiceApi";
 import { toast } from "react-toastify";
+import {
+  replacePlaceholders,
+  mapItemsForTemplate,
+  buildTemplateSender,
+  buildTemplateClient,
+  formatTemplateDate,
+} from '../template/template-document-utils';
+import { generatePdfFromHtml } from '../template/template-pdf-utils';
 
-// Import images
 import Invoice1 from "../../assets/Invoice_1.png";
 import Invoice2 from "../../assets/Invoice_2.png";
 import Invoice3 from "../../assets/Invoice_3.png";
@@ -21,8 +28,6 @@ import Invoice7 from "../../assets/Invoice_7.png";
 import Invoice8 from "../../assets/Invoice_8.png";
 import Invoice9 from '../../assets/Invoice_9.png';
 
-
-// Import templates
 import template1 from "../template/estimate 2/template1.html?raw";
 import template2 from "../template/estimate 2/template2.html?raw";
 import template3 from "../template/estimate 2/template3.html?raw";
@@ -33,9 +38,6 @@ import template7 from "../template/estimate 2/template7.html?raw";
 import template8 from "../template/estimate 2/template8.html?raw";
 import template9 from "../template/estimate 2/template9.html?raw";
 import templatePremium from '../template/invoice 2/invoice_premium.html?raw';
-import { replacePlaceholders } from '../template/template-document-utils';
-import { generatePdfFromHtml } from '../template/template-pdf-utils';
-
 
 const templates = [
   { id: 1, src: Invoice1, alt: "Estimate Template 1", html: template1 },
@@ -57,12 +59,6 @@ interface EstimateTemplateModalProps {
   templateNumber?: number;
 }
 
-const formatTemplateDate = (dateStr: any) => {
-  if (!dateStr) return "";
-  const s = String(dateStr);
-  return s.includes("T") ? s.split("T")[0] : s;
-};
-
 const EstimateTemplateModal: React.FC<EstimateTemplateModalProps> = ({
   open,
   onClose,
@@ -76,6 +72,8 @@ const EstimateTemplateModal: React.FC<EstimateTemplateModalProps> = ({
 
   const [getEstimateDetail] = useLazyGetEstimateDetailQuery();
   const [updateEstimate] = useUpdateEstimateMutation();
+  const { data: globalTaxes } = useGetTaxesQuery();
+  const { data: globalDiscounts } = useGetDiscountsQuery();
 
   const handleViewTemplate = async (templateId: number) => {
     setLoadingTemplateId(templateId);
@@ -101,9 +99,15 @@ const EstimateTemplateModal: React.FC<EstimateTemplateModalProps> = ({
       console.log("[InvoiceModal] Resolved Base64 - Logo:", logoUrl ? "FOUND" : "MISSING", "Signature:", signatureUrl ? "FOUND" : "MISSING");
 
 
+      const rawItems = data?.estimate_items || data?.invoice_items || [];
+      const mappedItems = mapItemsForTemplate(rawItems, {
+        taxes: globalTaxes,
+        discounts: globalDiscounts,
+      });
+
       const transformed: any = {
-        from: data?.user || {},
-        billTo: data?.clients || data?.client || {},
+        from: buildTemplateSender(data?.user || {}),
+        billTo: buildTemplateClient(data?.clients || data?.client || {}),
         estimateNumber: data?.estimate_number ?? "",
         invoiceNumber: data?.estimate_number ?? "",
         estimateDate: formatTemplateDate(data?.estimate_date ?? ""),
@@ -111,7 +115,9 @@ const EstimateTemplateModal: React.FC<EstimateTemplateModalProps> = ({
         expirationDate: formatTemplateDate(data?.valid_until ?? data?.due_date ?? ""),
         terms: data?.notes ?? "",
         amount: String(data?.total || data?.total_amount || data?.amount || "0"),
-        items: data?.estimate_items || data?.invoice_items || [],
+        items: mappedItems,
+        taxes: globalTaxes,
+        discounts: globalDiscounts,
         logo: logoUrl,
         signature: signatureUrl,
         clientId: data?.client_id || data?.client?.id || data?.clients?.id || (Array.isArray(data?.clients) ? data?.clients[0]?.id : data?.clients?.id),

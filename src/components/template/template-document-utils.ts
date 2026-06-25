@@ -5,33 +5,23 @@ import {
   generateItemsForLayout,
   getItemsLayoutCss,
 } from "./template-item-layouts";
+import {
+  mapItemsForTemplate,
+  resolveDiscountRate,
+  resolveTaxRate,
+} from "./template-item-rates";
+
+export {
+  mapItemsForTemplate,
+  resolveDiscountRate,
+  resolveTaxRate,
+  buildTemplateSender,
+  buildTemplateClient,
+  formatTemplateDate,
+} from "./template-item-rates";
 
 const formatMoney = (value: number) =>
   value.toLocaleString(undefined, { minimumFractionDigits: 2 });
-
-const resolveDiscountRate = (item: any): number => {
-  if (typeof item.discount === "number") return item.discount;
-  if (Array.isArray(item.discount)) {
-    return item.discount.reduce(
-      (sum: number, d: any) => sum + (parseFloat(d?.rate) || 0),
-      0
-    );
-  }
-  const discArray = item.estimate_item_discounts || item.invoice_item_discounts || [];
-  return discArray.reduce((sum: number, d: any) => sum + (d.discount?.rate || 0), 0);
-};
-
-const resolveTaxRate = (item: any): number => {
-  if (typeof item.tax === "number") return item.tax;
-  if (Array.isArray(item.tax)) {
-    return item.tax.reduce(
-      (sum: number, t: any) => sum + (parseFloat(t?.rate) || 0),
-      0
-    );
-  }
-  const taxArray = item.estimate_item_taxes || item.invoice_item_taxes || [];
-  return taxArray.reduce((sum: number, t: any) => sum + (t.tax?.rate || 0), 0);
-};
 
 export const TEMPLATE_COMPACT_STYLES = `
 <style id="constil-template-compact">
@@ -60,19 +50,20 @@ export const TEMPLATE_COMPACT_STYLES = `
     flex-shrink: 0 !important;
   }
 
-  .constil-items-table thead {
-    display: table-header-group !important;
+  .constil-items-section {
+    page-break-inside: auto !important;
   }
 
-  .invoice-item-row,
-  .constil-items-table tr.constil-item-row {
+  .constil-items-stack {
+    display: flex !important;
+    flex-direction: column !important;
+    gap: 28px !important;
+  }
+
+  .constil-item-card,
+  .invoice-item-row.constil-item-card {
     page-break-inside: avoid !important;
     break-inside: avoid !important;
-  }
-
-  .constil-items-table {
-    width: 100% !important;
-    border-collapse: collapse !important;
   }
 
   .doc-summary-section,
@@ -430,7 +421,11 @@ export function injectTemplateCompactStyles(html: string, template?: string): st
 }
 
 export const replacePlaceholders = (template: string, data: any): string => {
-  const items = data.items || [];
+  const items = mapItemsForTemplate(data.items || [], {
+    products: data.products,
+    taxes: data.taxes || data.taxCatalog,
+    discounts: data.discounts || data.discountCatalog,
+  });
   const totals = items.reduce(
     (acc: any, item: any) => {
       const q = Number(item.quantity || 1);

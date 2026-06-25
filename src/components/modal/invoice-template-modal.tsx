@@ -5,29 +5,28 @@
 "use client";
 import { templates, replacePlaceholders } from "./modal-invoices";
 import { generatePdfFromHtml } from "../template/template-pdf-utils";
+import {
+  mapItemsForTemplate,
+  buildTemplateSender,
+  buildTemplateClient,
+  formatTemplateDate,
+} from "../template/template-document-utils";
 import axios from "axios";
 import React, { useEffect, useState } from "react";
 import { Box } from "@mui/material";
-import { useLazyGetInvoiceDetailQuery, useSendInvoiceEmailMutation, useUpdateInvoiceMutation, useGetTaxesQuery, useGetDiscountsQuery } from "../../services/rtkapi/invoiceApi";
+import {
+  useLazyGetInvoiceDetailQuery,
+  useSendInvoiceEmailMutation,
+  useUpdateInvoiceMutation,
+  useGetTaxesQuery,
+  useGetDiscountsQuery,
+} from "../../services/rtkapi/invoiceApi";
 import { TemplateModalShell } from "./template-modal-shell";
 import { TemplatePickerGallery } from "./template-picker-gallery";
 import { TemplatePreviewToolbar } from "./template-preview-toolbar";
 import { toast } from "react-toastify";
 import { InvoiceData } from "../../types/invoice";
 import { S3UploadService } from "../data/s3-data";
-import { getApiList } from "../../utils/api-list";
-
-import logoImage from '../template/invoice 3/assets/CONSTIL.svg'
-import logoWhite from '../template/invoice 3/assets/CONSTILWHite.svg'
-import Invoice8 from "../../assets/Invoice_8.png";
-import Invoice9 from '../../assets/Invoice_9.png';
-
-
-const formatTemplateDate = (dateStr: any) => {
-  if (!dateStr) return "";
-  const s = String(dateStr);
-  return s.includes("T") ? s.split("T")[0] : s;
-};
 
 const InvoiceTemplateModal: React.FC<InvoiceTemplateModalProps> = ({
   open,
@@ -72,56 +71,18 @@ const InvoiceTemplateModal: React.FC<InvoiceTemplateModalProps> = ({
         id: data?.id || invoiceId,
         client_id: data?.client_id || data?.client?.id || data?.clients?.id || "",
         clientId: data?.client_id || data?.client?.id || data?.clients?.id || "",
-        from: {
-            ...data?.user,
-            register: {
-                name: data?.user?.first_name,
-                company_name: data?.user?.company_name,
-                email: data?.user?.email,
-                phone: data?.user?.phone,
-                address: data?.user?.company?.address || data?.user?.address
-            }
-        },
-        billTo: {
-            name: data?.clients?.name || data?.client?.name,
-            email: data?.clients?.email || data?.client?.email,
-            phone: data?.clients?.phone || data?.client?.phone,
-            address: data?.clients?.address || data?.client?.address
-        },
+        from: buildTemplateSender(data?.user || {}),
+        billTo: buildTemplateClient(data?.clients || data?.client || {}),
         invoiceNumber: data?.invoice_number ?? data?.estimate_number ?? "",
         invoiceDate: formatTemplateDate(data?.invoice_date ?? data?.estimate_date ?? ""),
         expirationDate: formatTemplateDate(data?.due_date ?? data?.valid_until ?? ""),
         terms: data?.notes ?? "",
-        items: (data?.invoice_items || data?.estimate_items || []).map((it: any) => {
-          // Resolve taxes from array of IDs or single value
-          let resolvedTax = 0;
-          if (Array.isArray(it.tax)) {
-            resolvedTax = it.tax.reduce((sum: number, id: string) => {
-              const taxObj = getApiList(globalTaxes).find((t: any) => String(t.id) === String(id));
-              return sum + (taxObj?.rate || 0);
-            }, 0);
-          } else {
-            resolvedTax = it.tax || 0;
-          }
-
-          // Resolve discounts from array of IDs or single value
-          let resolvedDiscount = 0;
-          if (Array.isArray(it.discount)) {
-            resolvedDiscount = it.discount.reduce((sum: number, id: string) => {
-              const discObj = getApiList(globalDiscounts).find((d: any) => String(d.id) === String(id));
-              return sum + (discObj?.rate || 0);
-            }, 0);
-          } else {
-            resolvedDiscount = it.discount || 0;
-          }
-
-          return {
-            ...it,
-            productName: it.product?.name || it.item_title || "Unnamed Item",
-            tax: resolvedTax || it.invoice_item_taxes?.reduce((sum: number, t: any) => sum + (t.tax?.rate || 0), 0) || 0,
-            discount: resolvedDiscount || it.invoice_item_discounts?.reduce((sum: number, d: any) => sum + (d.discount?.rate || 0), 0) || 0,
-          };
+        items: mapItemsForTemplate(data?.invoice_items || data?.estimate_items || [], {
+          taxes: globalTaxes,
+          discounts: globalDiscounts,
         }),
+        taxes: globalTaxes,
+        discounts: globalDiscounts,
         logo: logoUrl,
         signature: signatureUrl,
         templateId: templateId

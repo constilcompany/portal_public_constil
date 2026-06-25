@@ -3,6 +3,11 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
 import React, { useEffect, useMemo, useRef, useState } from "react";
 import { getApiList, toFeeSelectOptions } from "../../utils/api-list";
+import { feeSelectPortalProps } from "../../utils/fee-select-props";
+import {
+  getItemDiscountRateFromForm,
+  getItemTaxRateFromForm,
+} from "../template/template-item-rates";
 import {
   useCreateDiscountMutation,
   useGetClientsQuery,
@@ -213,20 +218,36 @@ const FormInvoice = ({ onClose }: FormInvoiceProps) => {
     const rawItems = d.invoice_items || d.items;
     if (Array.isArray(rawItems)) {
       const mapped = rawItems.map((it: any) => {
-        // Handle nested tax/discount from getInvoiceDetail
-        const taxIds = Array.isArray(it.invoice_item_taxes) 
-          ? it.invoice_item_taxes.map((t: any) => t.tax_id || t.id) 
-          : (it.tax || []);
-          
-        const discountIds = Array.isArray(it.invoice_item_discounts) 
-          ? it.invoice_item_discounts.map((dis: any) => dis.discount_id || dis.id) 
-          : (it.discount || []);
+        const taxEnabled =
+          it.tax_key === "True" ||
+          it.tax_key === true ||
+          String(it.tax_key).toLowerCase() === "true";
+        const discountEnabled =
+          it.discount_key === "True" ||
+          it.discount_key === true ||
+          String(it.discount_key).toLowerCase() === "true";
+
+        const taxIds = taxEnabled
+          ? Array.isArray(it.invoice_item_taxes)
+            ? it.invoice_item_taxes.map((t: any) => t.tax_id || t.id)
+            : Array.isArray(it.tax)
+              ? it.tax
+              : []
+          : [];
+
+        const discountIds = discountEnabled
+          ? Array.isArray(it.invoice_item_discounts)
+            ? it.invoice_item_discounts.map((dis: any) => dis.discount_id || dis.id)
+            : Array.isArray(it.discount)
+              ? it.discount
+              : []
+          : [];
 
         return {
           id: it.id ?? null, 
           product: it.product_id || it.product?.id || it.product || "",
           description: it.description ?? "",
-          quantity: Number(it.quantity ?? 1),
+          quantity: Math.max(1, Number(it.quantity ?? 1) || 1),
           price: Number(it.price || it.unit_price || 0),
           amount: Number((it.quantity ?? 1) * (it.price || it.unit_price || 0)),
           tax_key: it.tax_key === "True" || it.tax_key === true || String(it.tax_key).toLowerCase() === "true",
@@ -262,8 +283,8 @@ const FormInvoice = ({ onClose }: FormInvoiceProps) => {
       const newShowTax: { [key: number]: boolean } = {};
       const newShowDiscount: { [key: number]: boolean } = {};
       mapped.forEach((it: any, idx: number) => {
-        newShowTax[idx] = !!it.tax_key || (Array.isArray(it.tax) && it.tax.length > 0);
-        newShowDiscount[idx] = !!it.discount_key || (Array.isArray(it.discount) && it.discount.length > 0);
+        newShowTax[idx] = !!it.tax_key;
+        newShowDiscount[idx] = !!it.discount_key;
       });
       setShowTaxSection(newShowTax);
       setShowDiscountSection(newShowDiscount);
@@ -297,6 +318,11 @@ const FormInvoice = ({ onClose }: FormInvoiceProps) => {
 
     if (!selectedClient || items.length === 0) {
       toast.error("Please select client and add at least one item");
+      return;
+    }
+
+    if (items.some((item) => !item.quantity || Number(item.quantity) < 1)) {
+      toast.error("Quantity must be at least 1 for all items.");
       return;
     }
 
@@ -520,11 +546,17 @@ const FormInvoice = ({ onClose }: FormInvoiceProps) => {
 
       const mappedItems = items.map((item, index) => {
         const productObj = products?.data?.find((p: any) => p.id === item.product);
-        const itemDiscounts = selectedDiscountOptions[index] || [];
-        const dRateTotal = itemDiscounts.reduce((sum: number, d: any) => sum + (d.rate || 0), 0);
-        const itemTaxes = selectedTaxOptions[index] || [];
-        const tRateTotal = itemTaxes.reduce((sum: number, t: any) => sum + (t.rate || 0), 0);
-        return { ...item, productName: productObj?.name || "Unknown Product", discount: dRateTotal, tax: tRateTotal };
+        return {
+          ...item,
+          productName: productObj?.name || "Unknown Product",
+          discount: getItemDiscountRateFromForm(
+            item,
+            index,
+            selectedDiscountOptions,
+            showDiscountSection
+          ),
+          tax: getItemTaxRateFromForm(item, index, selectedTaxOptions, showTaxSection),
+        };
       });
 
             // Resolve Logo and Signature to Base64 to ensure they render in PDF
@@ -544,6 +576,9 @@ const FormInvoice = ({ onClose }: FormInvoiceProps) => {
         logo: logoUrl,
         signature: signatureUrl,
         amount: grandTotal,
+        taxes: taxesResponse,
+        discounts: discountsResponse,
+        products: products?.data,
         items: mappedItems || [],
       };
 
@@ -901,10 +936,21 @@ const FormInvoice = ({ onClose }: FormInvoiceProps) => {
     const { name, value } = e.target;
     setItems((prev) => {
       const updated = [...prev];
-      const item = { ...updated[index], [name]: name === "quantity" || name === "price" ? Number(value) : value };
+      const item = { ...updated[index] };
 
-      if (name === "quantity" || name === "price") {
+      if (name === "quantity") {
+        if (value === "") {
+          item.quantity = 1;
+        } else {
+          const q = Math.floor(Number(value));
+          item.quantity = Number.isFinite(q) && q >= 1 ? q : 1;
+        }
         item.amount = item.quantity * item.price;
+      } else if (name === "price") {
+        item.price = Number(value);
+        item.amount = item.quantity * item.price;
+      } else {
+        item[name] = value;
       }
 
       updated[index] = item;
@@ -942,31 +988,40 @@ const FormInvoice = ({ onClose }: FormInvoiceProps) => {
 
   // Total discount amount
   const totalDiscountAmount = useMemo(() => {
-    return selectedDiscountOptions.reduce((total, discounts, itemIndex) => {
-      if (!discounts?.length || !items[itemIndex]) return total;
-
-      const itemAmount = items[itemIndex].quantity * items[itemIndex].price;
-      const itemDiscountPercent = discounts.reduce((acc, discount) => acc + (discount.rate || 0), 0);
-
-      return total + ((itemAmount * itemDiscountPercent) / 100);
+    return items.reduce((total, item, itemIndex) => {
+      const rate = getItemDiscountRateFromForm(
+        item,
+        itemIndex,
+        selectedDiscountOptions,
+        showDiscountSection
+      );
+      if (!rate) return total;
+      const itemAmount = item.quantity * item.price;
+      return total + (itemAmount * rate) / 100;
     }, 0);
-  }, [selectedDiscountOptions, items]);
+  }, [items, selectedDiscountOptions, showDiscountSection]);
 
   // Total tax amount (applied after discount)
   const totalTaxAmount = useMemo(() => {
-    return selectedTaxOptions.reduce((total, taxes, itemIndex) => {
-      if (!taxes?.length || !items[itemIndex]) return total;
-
-      const itemAmount = items[itemIndex].quantity * items[itemIndex].price;
-      const itemDiscounts = selectedDiscountOptions[itemIndex] || [];
-      const itemDiscountPercent = itemDiscounts.reduce((acc, discount) => acc + (discount.rate || 0), 0);
-      const discountedAmount = itemAmount - ((itemAmount * itemDiscountPercent) / 100);
-
-      const itemTaxPercent = taxes.reduce((acc, tax) => acc + (tax.rate || 0), 0);
-
-      return total + ((discountedAmount * itemTaxPercent) / 100);
+    return items.reduce((total, item, itemIndex) => {
+      const taxRate = getItemTaxRateFromForm(
+        item,
+        itemIndex,
+        selectedTaxOptions,
+        showTaxSection
+      );
+      if (!taxRate) return total;
+      const itemAmount = item.quantity * item.price;
+      const discountRate = getItemDiscountRateFromForm(
+        item,
+        itemIndex,
+        selectedDiscountOptions,
+        showDiscountSection
+      );
+      const discountedAmount = itemAmount - (itemAmount * discountRate) / 100;
+      return total + (discountedAmount * taxRate) / 100;
     }, 0);
-  }, [selectedTaxOptions, selectedDiscountOptions, items]);
+  }, [items, selectedTaxOptions, selectedDiscountOptions, showTaxSection, showDiscountSection]);
 
   // Grand total
   const grandTotal = subtotal - totalDiscountAmount + totalTaxAmount;
@@ -1197,6 +1252,19 @@ const FormInvoice = ({ onClose }: FormInvoiceProps) => {
                               name="quantity"
                               value={item.quantity}
                               onChange={(e) => handleItemChange(index, e)}
+                              onKeyDown={(e) => {
+                                if (e.key === "-" || e.key === "e" || e.key === "E" || e.key === "+") {
+                                  e.preventDefault();
+                                }
+                              }}
+                              onBlur={(e) => {
+                                if (!e.target.value || Number(e.target.value) < 1) {
+                                  handleItemChange(index, {
+                                    ...e,
+                                    target: { ...e.target, name: "quantity", value: "1" },
+                                  } as React.ChangeEvent<HTMLInputElement>);
+                                }
+                              }}
                               className="w-full h-[50px] px-4 border border-gray-200 rounded-lg"
                             />
                           </div>
@@ -1257,7 +1325,7 @@ const FormInvoice = ({ onClose }: FormInvoiceProps) => {
                         <div className="flex flex-col sm:flex-row space-y-4 sm:space-y-0 sm:space-x-4 mt-4 w-full">
                           {/* Discount Card */}
                           {showDiscountSection[index] && (
-                            <div className="flex flex-col items-center border border-gray-300 rounded-lg p-4 w-full sm:w-[48%] md:w-[40%]">
+                            <div className="flex flex-col items-center border border-gray-300 rounded-lg p-4 w-full sm:w-[48%] md:w-[40%] relative z-30">
                               {/* Header */}
                               <div className="flex justify-between items-center border-b border-gray-200 p-2 w-full">
                                 <CircleDashed className="text-gray-500" />
@@ -1288,7 +1356,7 @@ const FormInvoice = ({ onClose }: FormInvoiceProps) => {
                               </div>
 
                               {/* Dropdown */}
-                              <div className="w-full mt-2">
+                              <div className="w-full mt-2 relative z-40">
                                 <Select
                                   options={discountOptions}
                                   value={selectedDiscountOptions[index] || []}
@@ -1296,6 +1364,7 @@ const FormInvoice = ({ onClose }: FormInvoiceProps) => {
                                   isMulti
                                   placeholder="Select Discount"
                                   controlShouldRenderValue={false}
+                                  {...feeSelectPortalProps}
                                 />
                               </div>
 
@@ -1380,7 +1449,7 @@ const FormInvoice = ({ onClose }: FormInvoiceProps) => {
 
                           {/* Tax Card */}
                           {showTaxSection[index] && (
-                            <div className="flex flex-col items-center border border-gray-300 rounded-lg p-4 w-full sm:w-[48%] md:w-[40%]">
+                            <div className="flex flex-col items-center border border-gray-300 rounded-lg p-4 w-full sm:w-[48%] md:w-[40%] relative z-30">
                               <div className="flex justify-between items-center border-b border-gray-200 p-2 w-full">
                                 <CarTaxiFront className="text-gray-500" />
                                 <span>TAX ({selectedTaxOptions[index]?.length || 0})</span>
@@ -1410,7 +1479,7 @@ const FormInvoice = ({ onClose }: FormInvoiceProps) => {
                               </div>
 
                               {/* Tax Dropdown */}
-                              <div className="w-full mt-2">
+                              <div className="w-full mt-2 relative z-40">
                                 <Select
                                   options={taxOptions}
                                   value={selectedTaxOptions[index] || []}
@@ -1419,6 +1488,7 @@ const FormInvoice = ({ onClose }: FormInvoiceProps) => {
                                   isSearchable
                                   placeholder="Select Tax"
                                   controlShouldRenderValue={false}
+                                  {...feeSelectPortalProps}
                                 />
                               </div>
 
@@ -1762,8 +1832,13 @@ const FormInvoice = ({ onClose }: FormInvoiceProps) => {
           client: selectedClient,
           items: items.map((item, idx) => ({
             ...item,
-            tax: selectedTaxOptions[idx]?.reduce((sum: any, t: any) => sum + (t.rate || 0), 0) || 0,
-            discount: selectedDiscountOptions[idx]?.reduce((sum: any, d: any) => sum + (d.rate || 0), 0) || 0,
+            tax: getItemTaxRateFromForm(item, idx, selectedTaxOptions, showTaxSection),
+            discount: getItemDiscountRateFromForm(
+              item,
+              idx,
+              selectedDiscountOptions,
+              showDiscountSection
+            ),
           })),
           invoiceDate,
           invoiceDue,

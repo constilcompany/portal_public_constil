@@ -41,8 +41,7 @@ import { InvoiceData } from '../../types/invoice';
 import { useDispatch } from 'react-redux';
 import { setSelectedTemplate } from '../../redux/templateSlice';
 import { AppDispatch } from '../../redux/store';
-import { replacePlaceholders } from '../template/template-document-utils';
-import { getApiList } from '../../utils/api-list';
+import { replacePlaceholders, mapItemsForTemplate, buildTemplateSender, buildTemplateClient, formatTemplateDate } from '../template/template-document-utils';
 
 export { replacePlaceholders };
 
@@ -96,65 +95,29 @@ const SelectTemplate = ({ open, onClose, previewData, setModalOpen, onConfirmAct
     const clientId = res.client;
     const selectedClientObj = allClientsGet.find((c) => c.id === clientId);
     
-    // Enrich items with their calculated total rates for specific preview
-    console.log("[Preview] Processing items for preview. Taxes available:", !!allTaxes, "Discounts available:", !!allDiscounts);
-    const mappedItems = res.items.map((item, idx) => {
-      const productObj = allproducts?.data?.find((p) => p.id === item.product);
-      
-      // Resolve discount rates
-      let dRate = 0;
-      if (Array.isArray(item.discount)) {
-        item.discount.forEach(d => {
-          if (typeof d === 'object' && d.rate !== undefined) {
-            dRate += (parseFloat(d.rate) || 0);
-          } else {
-            const found = getApiList(allDiscounts).find(x => String(x.id) === String(d));
-            console.log(`[Preview] Item ${idx} discount lookup for ${d}:`, found ? found.rate : "NOT FOUND");
-            if (found) dRate += (parseFloat(found.rate) || 0);
-          }
-        });
-      } else if (typeof item.discount === 'number') {
-        dRate = item.discount;
-      }
-
-      // Resolve tax rates
-      let tRate = 0;
-      if (Array.isArray(item.tax)) {
-        item.tax.forEach(t => {
-          if (typeof t === 'object' && t.rate !== undefined) {
-            tRate += (parseFloat(t.rate) || 0);
-          } else {
-            const found = getApiList(allTaxes).find(x => String(x.id) === String(t));
-            if (found) tRate += (parseFloat(found.rate) || 0);
-          }
-        });
-      } else if (typeof item.tax === 'number') {
-        tRate = item.tax;
-      }
-
-      return {
-        ...item,
-        productName: productObj?.name || item.product || 'Unknown Product',
-        discount: dRate,
-        tax: tRate,
-      };
+    const mappedItems = mapItemsForTemplate(res.items, {
+      products: allproducts?.data,
+      taxes: allTaxes,
+      discounts: allDiscounts,
     });
 
-            const logoSource = res?.logo_url || res?.logo || res?.company_logo || res?.company?.logo_url || "";
+    const logoSource = res?.logo_url || res?.logo || res?.company_logo || res?.company?.logo_url || "";
     const signatureSource = res?.signature_url || res?.signature || res?.user?.signature_url || res?.user?.signature || "";
     
     const logoUrl = await S3UploadService.getFileAsBase64(logoSource, 'paybue-invoice-estimation/logos');
     const signatureUrl = await S3UploadService.getFileAsBase64(signatureSource, 'paybue-invoice-estimation/signatures');
 
     const transformed = {
-      from: getCurrentUser?.data || getCurrentUser,
-      billTo: selectedClientObj || {},
+      from: buildTemplateSender(getCurrentUser?.data || getCurrentUser),
+      billTo: buildTemplateClient(selectedClientObj || {}),
       invoiceNumber: res.number,
       invoiceDate: res.invoiceDate,
       expirationDate: res.invoiceDue,
       terms: res.notes,
       logo: logoUrl,
       signature: signatureUrl,
+      taxes: allTaxes,
+      discounts: allDiscounts,
       amount: mappedItems.reduce((acc, item) => {
         const sub = item.price * item.quantity;
         const disc = (sub * item.discount) / 100;

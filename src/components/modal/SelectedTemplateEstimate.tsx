@@ -13,6 +13,8 @@ import {
   useGetClientsQuery, 
   useGetUserProfileQuery, 
   useGetProductsQuery,
+  useGetTaxesQuery,
+  useGetDiscountsQuery,
 } from "../../services/rtkapi/invoiceApi";
 
 // Assets
@@ -37,7 +39,7 @@ import template7 from "../template/estimate 2/template7.html?raw";
 import template8 from "../template/estimate 2/template8.html?raw";
 import template9 from "../template/estimate 2/template9.html?raw";
 import templatePremium from '../template/invoice 2/invoice_premium.html?raw';
-import { replacePlaceholders } from '../template/template-document-utils';
+import { replacePlaceholders, mapItemsForTemplate, buildTemplateSender, buildTemplateClient } from '../template/template-document-utils';
 
 export { replacePlaceholders };
 
@@ -68,6 +70,8 @@ const SelectTemplateEstimate: React.FC<any> = ({ open, onClose, previewData, set
   const { data: getCurrentUserRes } = useGetUserProfileQuery();
   const user = getCurrentUserRes?.data || getCurrentUserRes;
   const { data: allProductsRes } = useGetProductsQuery();
+  const { data: allTaxes } = useGetTaxesQuery();
+  const { data: allDiscounts } = useGetDiscountsQuery();
   const { data: packageData, isLoading: isPackageLoading } = useGetPackageBuyQuery();
 
   const availableTemplates = useMemo(() => {
@@ -90,12 +94,10 @@ const SelectTemplateEstimate: React.FC<any> = ({ open, onClose, previewData, set
     const res = previewData;
     const selectedClientObj = previewData.clientObj || allClientsGet.find((c) => String(c.id) === String(res.client));
     
-    const mappedItems = res.items.map((item) => {
-      const productObj = allProductsRes?.data?.find((p) => p.id === item.product);
-      return {
-        ...item,
-        productName: productObj?.name || item.product || 'Unknown Product',
-      };
+    const mappedItems = mapItemsForTemplate(res.items, {
+      products: allProductsRes?.data,
+      taxes: allTaxes,
+      discounts: allDiscounts,
     });
 
     const logoSource = res?.logo_url || res?.logo || res?.company_logo || "";
@@ -104,14 +106,24 @@ const SelectTemplateEstimate: React.FC<any> = ({ open, onClose, previewData, set
     const signatureUrl = await S3UploadService.getFileAsBase64(signatureSource, 'paybue-invoice-estimation/signatures');
 
     const transformed = {
-      from: previewData.user || user,
-      billTo: selectedClientObj || {},
+      from: buildTemplateSender(previewData.user || user),
+      billTo: buildTemplateClient(selectedClientObj || {}),
       invoiceNumber: res.number,
+      estimateNumber: res.number,
       invoiceDate: res.invoiceDate,
+      estimateDate: res.invoiceDate,
       expirationDate: res.invoiceDue,
       terms: res.notes,
       logo: logoUrl,
       signature: signatureUrl,
+      taxes: allTaxes,
+      discounts: allDiscounts,
+      amount: mappedItems.reduce((acc, item) => {
+        const sub = item.price * item.quantity;
+        const disc = (sub * item.discount) / 100;
+        const tax = ((sub - disc) * item.tax) / 100;
+        return acc + (sub - disc + tax);
+      }, 0),
       items: mappedItems || [],
     };
 
