@@ -146,13 +146,35 @@ const SubscriptionModal = ({ open, onClose }: SubscriptionModalProps) => {
   };
 
   // ───────── Filter & Sort Packages ─────────
+  const normalizePlanName = (name: string) => (name || '').toLowerCase().trim();
+
+  const getPlanOrder = (name: string): number => {
+    const tier = normalizePlanName(name);
+    const order: { [key: string]: number } = {
+      'free trial': 0,
+      starter: 1,
+      pro: 2,
+      team: 3,
+      basic: 4,
+      standard: 5,
+      professional: 6,
+      enterprise: 7,
+    };
+    return order[tier] ?? 99;
+  };
+
+  const isFreeTrialPlan = (name: string) => normalizePlanName(name) === 'free trial';
+
   const filteredPackages = packages
-    .filter((pkg) => pkg.billing_interval === billingCycle)
-    .sort((a, b) => {
-      const order: { [key: string]: number } = { basic: 1, Standard: 2, professional: 3, enterprise: 4 };
-      const tierA = (a.name || '').toLowerCase();
-      const tierB = (b.name || '').toLowerCase();
-      return (order[tierA] || 4) - (order[tierB] || 4);
+    .filter((pkg) => {
+      if (pkg.billing_type && pkg.billing_type !== 'subscription') return false;
+      if (isFreeTrialPlan(pkg.name)) return true;
+      return pkg.billing_interval === billingCycle;
+    })
+    .sort((a, b) => getPlanOrder(a.name) - getPlanOrder(b.name))
+    .filter((pkg, index, arr) => {
+      const name = normalizePlanName(pkg.name);
+      return arr.findIndex((p) => normalizePlanName(p.name) === name) === index;
     });
 
   // ───────── Price Display ─────────
@@ -226,7 +248,7 @@ const SubscriptionModal = ({ open, onClose }: SubscriptionModalProps) => {
           ) : (
             <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
               {filteredPackages.map((pkg) => {
-                const isPremium = ['premium', 'professional'].includes((pkg.name || '').toLowerCase());
+                const isPremium = ['premium', 'professional', 'pro'].includes(normalizePlanName(pkg.name));
                 const isSelected = selectedPackage?.id === pkg.id;
 
                 return (
