@@ -233,7 +233,7 @@ export function Home() {
             className="bg-[#448AFF] hover:bg-[#3d7ef7] text-white rounded-lg font-medium px-5 py-2 flex items-center justify-center gap-2 transition-colors shrink-0"
           >
             <Sparkles size={18} />
-            Create AI Estimate
+            Upload a Blueprint
           </button>
         </div>
 

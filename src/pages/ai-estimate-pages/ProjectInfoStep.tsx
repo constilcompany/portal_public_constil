@@ -3,6 +3,7 @@ import { useState } from 'react';
 import FormNewClienteModal from '../../components/formnewclient/form-new-client';
 import { useGetClientsQuery } from '../../services/rtkapi/invoiceApi';
 import Select from 'react-select';
+import UploadBluePrint from './UploadBluePrint';
 
 const ProjectInfoStep = ({ data, setData }: any) => {
   const { data: clients, isLoading } = useGetClientsQuery();
@@ -131,6 +132,11 @@ const ProjectInfoStep = ({ data, setData }: any) => {
               }
               className="w-full border border-gray-300 rounded-lg px-4 py-2"
             />
+          </div>
+
+          {/* Upload Blueprint */}
+          <div className="pt-6 mt-6 border-t border-gray-200">
+            <UploadBluePrint data={data} setData={setData} />
           </div>
         </div>
       </div>

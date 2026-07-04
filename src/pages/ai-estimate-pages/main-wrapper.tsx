@@ -2,8 +2,6 @@
 import { useEffect, useState } from 'react';
 import { ChevronLeft } from 'lucide-react';
 import ProjectInfoStep from './ProjectInfoStep';
-import UploadBluePrint from './UploadBluePrint';
-import { StepIndicator } from './StepIndicator';
 import { useNavigate } from 'react-router-dom';
 import { toast } from 'react-toastify';
 import axios from 'axios';
@@ -21,10 +19,10 @@ const CreateProjectWizard = () => {
   const dispatch = useDispatch();
   const token = useSelector((state: RootState) => state.auth.token);
 
-  const [currentStep, setCurrentStep] = useState(1);
   const [uploading, setUploading] = useState(false);
   const [progress, setProgress] = useState(0);
   const [statusText, setStatusText] = useState('Uploading PDF...');
+  const [jobStage, setJobStage] = useState<'idle' | 'uploading' | 'polling' | 'saving'>('idle');
 
   const [projectData, setProjectData] = useState({
     projectName: '',
@@ -35,23 +33,16 @@ const CreateProjectWizard = () => {
     files: [] as File[],
   });
 
-  const handleNext = async () => {
-    if (currentStep === 1) {
-      if (!projectData.projectName || !projectData.client) {
-        toast.error('Please fill all required fields');
-        return;
-      }
-      setCurrentStep(2);
+  const handleSubmit = async () => {
+    if (!projectData.projectName || !projectData.client) {
+      toast.error('Please fill all required fields');
       return;
     }
-    if (currentStep === 2) {
-      await handleFinalSubmit();
-    }
+    await handleFinalSubmit();
   };
 
   const handleBack = () => {
-    if (currentStep > 1) setCurrentStep((prev) => prev - 1);
-    else navigate('/estimates/ai');
+    navigate('/estimates/ai');
   };
 
   const [packages, setPackages] = useState<any>({});
@@ -102,10 +93,51 @@ const CreateProjectWizard = () => {
   const [jobId, setJobId] = useState<string | null>(null);
   const [currentS3Key, setCurrentS3Key] = useState<string | null>(null);
 
+  useEffect(() => {
+    if (jobStage !== 'polling') return;
+
+    setStatusText('Identifying layers...');
+    setProgress(20);
+
+    let seconds = 0;
+    const interval = setInterval(() => {
+      seconds += 1;
+      
+      if (seconds <= 6) {
+        // Linearly interpolate progress from 20 to 40 over 6 seconds
+        const currentProgress = 20 + Math.round((seconds / 6) * 20);
+        setProgress(currentProgress);
+        
+        if (seconds === 6) {
+          setStatusText('Analyzing...');
+        }
+      } else if (seconds <= 15) {
+        // Linearly interpolate progress from 40 to 60 over 9 seconds (from second 6 to 15)
+        const currentProgress = 40 + Math.round(((seconds - 6) / 9) * 20);
+        setProgress(currentProgress);
+        
+        if (seconds === 15) {
+          setStatusText('Estimating...');
+        }
+      } else {
+        // Progress goes from 60 to 95 slowly (capping at 95)
+        setProgress((prev) => {
+          if (prev >= 95) return 95;
+          return prev + 1;
+        });
+      }
+    }, 1000);
+
+    return () => clearInterval(interval);
+  }, [jobStage]);
+
   usePdfJobPolling(
     jobId,
     async (detail) => {
       console.log("✅ PDF Job Completed. Detail payload:", detail);
+      setJobStage('saving');
+      setStatusText('Verifying Output...');
+      setProgress(95);
       try {
         const rawData = detail;
         const tablesContainer = rawData?.tables_json || rawData?.json_data || rawData;
@@ -118,8 +150,7 @@ const CreateProjectWizard = () => {
           throw new Error("AI analysis did not return any recognized table data.");
         }
 
-        setStatusText('Saving AI Project...');
-        setProgress(92);
+        setProgress(97);
 
         // 1. Create main estimate record
         const mainEstRes = await uploadAiEstimate({
@@ -137,8 +168,7 @@ const CreateProjectWizard = () => {
         const estimateId = record?.id;
 
         if (estimateId) {
-          setStatusText('Saving Analysis Results...');
-          setProgress(95);
+          setProgress(99);
           console.log("Saving results to 'ai_estimate_results' for ID:", estimateId);
 
           // 2. Save JSON results - Using minimal payload to avoid 400 errors
@@ -167,6 +197,7 @@ const CreateProjectWizard = () => {
         toast.error(err?.message || "Failed to save processing results");
         setStatusText('Error saving results');
       } finally {
+        setJobStage('idle');
         setUploading(false);
         setJobId(null);
         setCurrentS3Key(null);
@@ -174,6 +205,7 @@ const CreateProjectWizard = () => {
       }
     },
     (msg) => {
+      setJobStage('idle');
       setStatusText('AI processing failed');
       toast.error(msg);
       setUploading(false);
@@ -193,17 +225,16 @@ const CreateProjectWizard = () => {
     }
 
     setUploading(true);
-    setProgress(5);
-    setStatusText('Uploading PDF...');
+    setProgress(0);
+    setJobStage('uploading');
+    setStatusText('Reading and Extracting Blue Print...');
 
     try {
       const s3Key = await S3UploadService.uploadFileInChunks(file, (pct) => {
-        setProgress(pct > 80 ? 80 : pct);
+        setProgress(Math.round((pct * 20) / 100));
       }, 'paybue-invoice-estimation/blueprints');
 
       setCurrentS3Key(s3Key);
-      setProgress(90);
-      setStatusText('Initializing job tracker...');
 
       const { data: jobRes } = await axios.post(
         `${import.meta.env.VITE_SUPABASE_URL}/rest/v1/pdf_jobs`,
@@ -224,9 +255,9 @@ const CreateProjectWizard = () => {
       const newJobId = jobRes?.[0]?.id;
       if (!newJobId) throw new Error("Failed to create background job");
 
-      setStatusText('Triggering AI Analysis...');
-
-      const fastApiBase = import.meta.env.VITE_FASTAPI_URL || 'https://quaintly-tadpole-hemstitch.ngrok-free.dev';
+      const fastApiBase = import.meta.env.DEV 
+        ? '/api-fast' 
+        : (import.meta.env.VITE_FASTAPI_URL || 'https://paybue-quee.hnhsofttechsolutions.com');
       
       axios.post(
         `${fastApiBase}/estimate`,
@@ -265,12 +296,12 @@ const CreateProjectWizard = () => {
       }
 
       setJobId(jobRes[0]?.id);
-      setStatusText('PDF uploaded. Starting AI analysis...');
-      setProgress(95);
+      setJobStage('polling');
 
     } catch (err: any) {
       console.error(err);
       toast.error(err?.message || 'Something went wrong');
+      setJobStage('idle');
       setUploading(false);
       setTimeout(() => setProgress(0), 800);
     }
@@ -284,25 +315,16 @@ const CreateProjectWizard = () => {
           Back to Projects
         </button>
 
-        <div className="pb-5">
-          <StepIndicator currentStep={currentStep} totalSteps={2} />
-        </div>
-
         <div className="bg-gray-50 border border-gray-100 rounded-2xl p-8 mb-8 shadow-sm">
-          {currentStep === 1 && (
-            <ProjectInfoStep data={projectData} setData={setProjectData} />
-          )}
-          {currentStep === 2 && (
-            <UploadBluePrint data={projectData} setData={setProjectData} />
-          )}
+          <ProjectInfoStep data={projectData} setData={setProjectData} />
         </div>
 
         <div className="flex justify-end">
           <button
-            onClick={handleNext}
+            onClick={handleSubmit}
             className="bg-[#448AFF] hover:bg-blue-600 text-white px-10 py-2.5 rounded-xl font-bold text-sm shadow-lg shadow-blue-100 transition-all active:scale-95"
           >
-            {currentStep === 2 ? 'Submit →' : 'Next →'}
+            Submit →
           </button>
         </div>
 

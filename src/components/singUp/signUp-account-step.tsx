@@ -14,7 +14,6 @@ import { userRegistrationWithEmail } from "../../services/auth-service";
 import { AUTH_INPUT_CLASS, AUTH_LABEL_CLASS } from "../../pages/auth/auth-layout";
 
 interface FormValues {
-  phoneNumber: string;
   address: string;
   zipCode: string;
   state: string;
@@ -45,7 +44,6 @@ export const SingUpAccountStep: React.FC = () => {
     handleBlur,
   } = useFormik<FormValues>({
     initialValues: {
-      phoneNumber: "",
       address: "",
       zipCode: "",
       state: "",
@@ -53,7 +51,6 @@ export const SingUpAccountStep: React.FC = () => {
       country: "",
     },
     validationSchema: Yup.object({
-      phoneNumber: Yup.string().required("Phone number is required"),
       address: Yup.string().required("Address is required"),
       zipCode: Yup.string().required("Zip code is required"),
       state: Yup.string().required("State is required"),
@@ -76,7 +73,7 @@ export const SingUpAccountStep: React.FC = () => {
             user?.email,
             user?.password,
             undefined, // couponCode
-            values.phoneNumber,
+            undefined, // phone
             values.address,
             values.zipCode,
             values.city,
@@ -112,26 +109,6 @@ export const SingUpAccountStep: React.FC = () => {
   return (
     <>
       <form onSubmit={handleSubmit} className="grid grid-cols-4 gap-4">
-
-        <div className="input-group col-span-full">
-          <label htmlFor="phone" className={AUTH_LABEL_CLASS}>
-            PHONE NUMBER
-          </label>
-          <input
-            type="text"
-            id="phone"
-            name="phoneNumber"
-            placeholder="Phone Number"
-            className={AUTH_INPUT_CLASS}
-            value={values.phoneNumber}
-            onChange={handleChange}
-            onBlur={handleBlur}
-          />
-          {touched.phoneNumber && errors.phoneNumber && (
-            <p className="text-[#f4777f] mt-1.5">{errors.phoneNumber}</p>
-          )}
-        </div>
-
         <div className="input-group col-span-4">
           <label htmlFor="address" className={AUTH_LABEL_CLASS}>
             ADDRESS

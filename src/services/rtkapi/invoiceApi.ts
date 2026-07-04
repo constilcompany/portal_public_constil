@@ -413,7 +413,7 @@ const invoiceApi = createAPI.injectEndpoints({
     }),
     estimateAi: build.mutation({
       query: (body) => ({
-        url: `https://quaintly-tadpole-hemstitch.ngrok-free.dev/estimate`,
+        url: `${import.meta.env.VITE_FASTAPI_URL || 'https://paybue-quee.hnhsofttechsolutions.com'}/estimate`,
         method: 'POST',
         headers: {
           'ngrok-skip-browser-warning': 'true'

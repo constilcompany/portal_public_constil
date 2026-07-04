@@ -21,6 +21,8 @@ import {
   Sparkles,
   Table2,
   X,
+  Mic,
+  MicOff,
 } from 'lucide-react';
 import {
   useAiTableDataMutation,
@@ -314,16 +316,187 @@ const File = () => {
     }
   };
 
+  const [showFinalResultModal, setShowFinalResultModal] = useState(false);
+  const [showEmailModal, setShowEmailModal] = useState(false);
+  const [customerEmail, setCustomerEmail] = useState('');
+  const [isSendingEmail, setIsSendingEmail] = useState(false);
+  const [templateMetadata, setTemplateMetadata] = useState({
+    date: '',
+    projectId: '',
+    address: '',
+    scope: '',
+    drawingRef: '',
+    scale: ''
+  });
+
+  const [activeTab, setActiveTab] = useState<'cover' | 'summary' | 'scope' | 'timeline' | 'warranty' | 'pricing' | 'signature'>('cover');
+  const [proposalPreparedFor, setProposalPreparedFor] = useState('');
+  const [proposalPreparedBy, setProposalPreparedBy] = useState('CONSTIL Team');
+  const [proposalSummary, setProposalSummary] = useState('');
+  const [proposalScope, setProposalScope] = useState('');
+  const [proposalTimelineDuration, setProposalTimelineDuration] = useState('4 Weeks');
+  const [proposalTimelineStart, setProposalTimelineStart] = useState('Upon Agreement');
+  const [proposalTimelineNotes, setProposalTimelineNotes] = useState('Milestones:\n- Week 1: Mobilization & Surface Prep\n- Week 2-3: Core Execution\n- Week 4: Final Inspection & Clean-up');
+  const [proposalWarrantyPeriod, setProposalWarrantyPeriod] = useState('1 Year Workmanship Warranty');
+  const [proposalWarrantyTerms, setProposalWarrantyTerms] = useState('CONSTIL guarantees all installation workmanship and labor against defects for a period of one (1) year following project completion.');
+  const [proposalPricingSubtotal, setProposalPricingSubtotal] = useState(0);
+  const [proposalPricingTax, setProposalPricingTax] = useState(0);
+  const [proposalPricingContingency, setProposalPricingContingency] = useState(0);
+  const [proposalPricingOverhead, setProposalPricingOverhead] = useState(0);
+  const [proposalPricingTotal, setProposalPricingTotal] = useState(0);
+
+  const [isGeneratingProposal, setIsGeneratingProposal] = useState(false);
+  const [proposalPricingText, setProposalPricingText] = useState('');
+  const [logoUrl, setLogoUrl] = useState<string | null>(null);
+  const [contractorSignatureUrl, setContractorSignatureUrl] = useState<string | null>(null);
+  const [clientSignatureUrl, setClientSignatureUrl] = useState<string | null>(null);
+  const [proposalSignatureDate, setProposalSignatureDate] = useState('');
+  useEffect(() => {
+    const sub = Number(proposalPricingSubtotal) || 0;
+    const tax = Number(proposalPricingTax) || 0;
+    const cont = Number(proposalPricingContingency) || 0;
+    const oh = Number(proposalPricingOverhead) || 0;
+    setProposalPricingTotal(sub + tax + cont + oh);
+  }, [proposalPricingSubtotal, proposalPricingTax, proposalPricingContingency, proposalPricingOverhead]);
+
   const [chatInput, setChatInput] = useState('');
   const [chatMessages, setChatMessages] = useState<{ from: 'user' | 'bot'; text: string }[]>([]);
   const [chatPosition, setChatPosition] = useState<{ top: number; left: number } | null>(null);
   const [chatSending, setChatSending] = useState(false);
+  const [isRecording, setIsRecording] = useState(false);
+  const recognitionRef = useRef<any>(null);
+
+  const startSpeechToText = () => {
+    if (recognitionRef.current) {
+      try {
+        recognitionRef.current.abort();
+      } catch (e) {
+        console.error(e);
+      }
+      recognitionRef.current = null;
+    }
+
+    const SpeechRecognition = (window as any).SpeechRecognition || (window as any).webkitSpeechRecognition;
+    if (!SpeechRecognition) {
+      toast.error("Speech recognition is not supported in this browser. Please try Chrome or Safari.");
+      return;
+    }
+
+    const startRecognitionEngine = () => {
+      try {
+        const rec = new SpeechRecognition();
+        rec.continuous = false; // continuous = false is highly stable and automatically endpoints
+        rec.interimResults = false;
+        rec.lang = 'en-US';
+
+        rec.onstart = () => {
+          setIsRecording(true);
+        };
+
+        rec.onresult = (event: any) => {
+          let transcript = '';
+          for (let i = event.resultIndex; i < event.results.length; i++) {
+            if (event.results[i].isFinal) {
+              transcript += event.results[i][0].transcript;
+            }
+          }
+          if (transcript) {
+            setChatInput(prev => (prev + ' ' + transcript).trim());
+          }
+        };
+
+        rec.onerror = (e: any) => {
+          console.error("Speech error:", e);
+          setIsRecording(false);
+          recognitionRef.current = null;
+          toast.error(`Speech recognition error: ${e.error}`);
+        };
+
+        rec.onend = () => {
+          setIsRecording(false);
+          recognitionRef.current = null;
+        };
+
+        recognitionRef.current = rec;
+        rec.start();
+      } catch (recErr: any) {
+        console.error("Failed to start SpeechRecognition:", recErr);
+        setIsRecording(false);
+        recognitionRef.current = null;
+      }
+    };
+
+    // Optimize: query browser permissions status first to avoid double start/stop mic stutters
+    if (navigator.permissions && navigator.permissions.query) {
+      navigator.permissions.query({ name: 'microphone' as any })
+        .then((permissionStatus) => {
+          if (permissionStatus.state === 'granted') {
+            startRecognitionEngine();
+          } else {
+            // Permission is not yet granted, trigger getUserMedia to prompt
+            navigator.mediaDevices.getUserMedia({ audio: true })
+              .then((stream) => {
+                stream.getTracks().forEach(track => track.stop());
+                startRecognitionEngine();
+              })
+              .catch((err) => {
+                console.error("Microphone access denied:", err);
+                toast.error("Microphone permission denied or device is busy.");
+                setIsRecording(false);
+                recognitionRef.current = null;
+              });
+          }
+        })
+        .catch(() => {
+          startRecognitionEngine();
+        });
+    } else {
+      startRecognitionEngine();
+    }
+  };
+
+  const stopSpeechToText = () => {
+    if (recognitionRef.current) {
+      try {
+        recognitionRef.current.abort();
+      } catch (err) {
+        console.error("Error aborting speech recognition:", err);
+      }
+      setIsRecording(false);
+      recognitionRef.current = null;
+      toast.success("Voice note captured!");
+    }
+  };
+
+  useEffect(() => {
+    return () => {
+      if (recognitionRef.current) {
+        try {
+          recognitionRef.current.abort();
+        } catch (e) {
+          console.error(e);
+        }
+        recognitionRef.current = null;
+      }
+      setIsRecording(false);
+    };
+  }, [chatOpen]);
 
   const bottomRef = useRef<HTMLDivElement | null>(null);
 
   useEffect(() => {
     bottomRef.current?.scrollIntoView({ behavior: 'smooth' });
   }, [chatMessages, chatSending]);
+
+  const textareaRef = useRef<HTMLTextAreaElement | null>(null);
+
+  useEffect(() => {
+    if (textareaRef.current) {
+      textareaRef.current.style.height = 'auto';
+      const newHeight = Math.min(textareaRef.current.scrollHeight, 96);
+      textareaRef.current.style.height = `${newHeight}px`;
+    }
+  }, [chatInput]);
 
   const buildConversationHistory = () => {
     return {
@@ -384,6 +557,466 @@ const File = () => {
         setLoading(false);
         setProgress(0);
       }, 400);
+    }
+  };
+
+  const generateProposalPDF = () => {
+    const doc = new jsPDF({
+      orientation: 'p',
+      unit: 'mm',
+      format: 'a4',
+      compress: true
+    }); // Portrait A4: 210mm wide x 297mm high with compression
+    const pageWidth = 210;
+    const pageHeight = 297;
+    const margin = 20;
+    const contentWidth = pageWidth - (margin * 2);
+
+    // Helper: Draw header on content pages
+    const drawContentHeader = () => {
+      doc.setFont("Helvetica", "bold");
+      doc.setFontSize(10);
+      doc.setTextColor(150, 150, 150);
+      doc.text("CONSTIL Takeoff Proposal", margin, 15);
+      
+      doc.setFontSize(10);
+      const textVal = templateMetadata.projectId || 'Construction Proposal';
+      doc.text(textVal, pageWidth - margin - doc.getTextWidth(textVal), 15);
+      
+      doc.setDrawColor(220, 220, 220);
+      doc.setLineWidth(0.5);
+      doc.line(margin, 17, pageWidth - margin, 17);
+    };
+
+    // Helper: Draw footer on all pages
+    const drawContentFooter = (pageNum: number) => {
+      doc.setDrawColor(220, 220, 220);
+      doc.setLineWidth(0.5);
+      doc.line(margin, pageHeight - 15, pageWidth - margin, pageHeight - 15);
+      
+      doc.setFont("Helvetica", "normal");
+      doc.setFontSize(8);
+      doc.setTextColor(150, 150, 150);
+      doc.text("Confidential & Proprietary", margin, pageHeight - 10);
+      doc.text(`Page ${pageNum}`, pageWidth - margin - doc.getTextWidth(`Page ${pageNum}`), pageHeight - 10);
+    };
+
+    // PAGE 1: COVER PAGE
+    // Draw Logo if uploaded
+    if (logoUrl) {
+      try {
+        doc.addImage(logoUrl, 'PNG', margin, 25, 45, 15);
+      } catch (err) {
+        console.error("Error drawing logo in PDF:", err);
+      }
+    } else {
+      // Draw a default text logo
+      doc.setFont("Helvetica", "bold");
+      doc.setFontSize(18);
+      doc.setTextColor(68, 138, 255); // #448AFF
+      doc.text("CONSTIL", margin, 32);
+      doc.setFontSize(12);
+      doc.setTextColor(100, 100, 100);
+      doc.text("Takeoffs & Estimation", margin, 37);
+    }
+
+    doc.setFont("Helvetica", "bold");
+    doc.setFontSize(28);
+    doc.setTextColor(30, 41, 59); // Slate-800
+    doc.text("CONSTRUCTION PROPOSAL", margin, 70);
+    doc.text("& BUDGET ESTIMATE", margin, 82);
+
+    doc.setDrawColor(68, 138, 255); // #448AFF
+    doc.setLineWidth(2);
+    doc.line(margin, 90, 80, 90);
+
+    doc.setFont("Helvetica", "normal");
+    doc.setFontSize(12);
+    doc.setTextColor(100, 116, 139); // Slate-500
+    const subtitleText = "Detailed material quantification, pricing breakdown, and execution scope details.";
+    const splitSubtitle = doc.splitTextToSize(subtitleText, contentWidth);
+    doc.text(splitSubtitle, margin, 100);
+
+    // Draw Metadata box
+    const tableData = [
+      ["Project ID:", templateMetadata.projectId || 'N/A', "Prepared For:", proposalPreparedFor || 'N/A'],
+      ["Date:", templateMetadata.date || new Date().toLocaleDateString(), "Prepared By:", proposalPreparedBy || 'N/A'],
+      ["Address:", templateMetadata.address || 'N/A', "Drawing Scale:", templateMetadata.scale || 'N/A']
+    ];
+
+    autoTable(doc, {
+      startY: 120,
+      body: tableData,
+      theme: 'plain',
+      styles: { fontSize: 9, cellPadding: 3, textColor: [71, 85, 105], font: 'Helvetica' },
+      columnStyles: {
+        0: { fontStyle: 'bold', cellWidth: 25 },
+        1: { cellWidth: 60 },
+        2: { fontStyle: 'bold', cellWidth: 25 },
+        3: { cellWidth: 60 }
+      }
+    });
+
+    drawContentFooter(1);
+
+    // PAGE 2: PROJECT SUMMARY & SCOPE OF WORK
+    doc.addPage();
+    drawContentHeader();
+    
+    doc.setFont("Helvetica", "bold");
+    doc.setFontSize(14);
+    doc.setTextColor(30, 41, 59);
+    doc.text("1. PROJECT SUMMARY", margin, 30);
+    
+    doc.setFont("Helvetica", "normal");
+    doc.setFontSize(9);
+    doc.setTextColor(71, 85, 105);
+    const splitSummary = doc.splitTextToSize(proposalSummary, contentWidth);
+    doc.text(splitSummary, margin, 36);
+
+    // Calculate Y for next section
+    const summaryHeight = splitSummary.length * 4;
+    let scopeY = 36 + summaryHeight + 15;
+
+    doc.setFont("Helvetica", "bold");
+    doc.setFontSize(14);
+    doc.setTextColor(30, 41, 59);
+    doc.text("2. SCOPE OF WORK", margin, scopeY);
+
+    doc.setFont("Helvetica", "normal");
+    doc.setFontSize(9);
+    doc.setTextColor(71, 85, 105);
+    const splitScope = doc.splitTextToSize(proposalScope, contentWidth);
+    doc.text(splitScope, margin, scopeY + 6);
+
+    drawContentFooter(2);
+
+    // PAGE 3: TIMELINE & WARRANTY
+    doc.addPage();
+    drawContentHeader();
+
+    doc.setFont("Helvetica", "bold");
+    doc.setFontSize(14);
+    doc.setTextColor(30, 41, 59);
+    doc.text("3. PROJECT TIMELINE & MILESTONES", margin, 30);
+
+    doc.setFont("Helvetica", "bold");
+    doc.setFontSize(10);
+    doc.setTextColor(71, 85, 105);
+    doc.text(`Target Duration: `, margin, 38);
+    doc.setFont("Helvetica", "normal");
+    doc.text(proposalTimelineDuration, margin + doc.getTextWidth("Target Duration: "), 38);
+
+    doc.setFont("Helvetica", "bold");
+    doc.text(`Estimated Start: `, margin, 44);
+    doc.setFont("Helvetica", "normal");
+    doc.text(proposalTimelineStart, margin + doc.getTextWidth("Estimated Start: "), 44);
+
+    const splitTimeline = doc.splitTextToSize(proposalTimelineNotes, contentWidth);
+    doc.text(splitTimeline, margin, 52);
+
+    const timelineHeight = splitTimeline.length * 4;
+    let warrantyY = 52 + timelineHeight + 15;
+
+    doc.setFont("Helvetica", "bold");
+    doc.setFontSize(14);
+    doc.setTextColor(30, 41, 59);
+    doc.text("4. WARRANTY TERMS & CONDITIONS", margin, warrantyY);
+
+    doc.setFont("Helvetica", "bold");
+    doc.setFontSize(10);
+    doc.setTextColor(71, 85, 105);
+    doc.text(`Warranty Period: `, margin, warrantyY + 8);
+    doc.setFont("Helvetica", "normal");
+    doc.text(proposalWarrantyPeriod, margin + doc.getTextWidth("Warranty Period: "), warrantyY + 8);
+
+    const splitWarranty = doc.splitTextToSize(proposalWarrantyTerms, contentWidth);
+    doc.text(splitWarranty, margin, warrantyY + 16);
+
+    drawContentFooter(3);
+
+    // PAGE 4: BUDGET SUMMARY & SIGNATURES
+    doc.addPage();
+    drawContentHeader();
+
+    doc.setFont("Helvetica", "bold");
+    doc.setFontSize(14);
+    doc.setTextColor(30, 41, 59);
+    doc.text("5. FINANCIAL BUDGET BREAKDOWN", margin, 30);
+
+    doc.setFont("Helvetica", "normal");
+    doc.setFontSize(9);
+    doc.setTextColor(71, 85, 105);
+    const splitPricingText = doc.splitTextToSize(proposalPricingText, contentWidth);
+    doc.text(splitPricingText, margin, 36);
+
+    const pricingTextHeight = splitPricingText.length * 4;
+    let pricingTableY = 36 + pricingTextHeight + 6;
+
+    // Draw Budget summary grid
+    const pricingRows = [
+      ["Subtotal (Takeoff Base Cost):", `$${proposalPricingSubtotal.toLocaleString()}`],
+      ["Overhead & Profit (20%):", `$${proposalPricingOverhead.toLocaleString()}`],
+      ["Contingency (5%):", `$${proposalPricingContingency.toLocaleString()}`],
+      ["Insurance / Taxes (5%):", `$${proposalPricingTax.toLocaleString()}`],
+      ["TOTAL CONTRACT VALUE:", `$${proposalPricingTotal.toLocaleString()}`]
+    ];
+
+    autoTable(doc, {
+      startY: pricingTableY,
+      body: pricingRows,
+      theme: 'grid',
+      styles: { fontSize: 9, cellPadding: 2.5, font: 'Helvetica' },
+      columnStyles: {
+        0: { cellWidth: 100 },
+        1: { halign: 'right', cellWidth: 40 }
+      },
+      didParseCell: (data) => {
+        if (data.row.index === 4) {
+          data.cell.styles.fontStyle = 'bold';
+          data.cell.styles.textColor = [68, 138, 255];
+        }
+      }
+    });
+
+    // @ts-ignore
+    let sigY = doc.lastAutoTable.finalY + 15;
+
+    doc.setFont("Helvetica", "bold");
+    doc.setFontSize(12);
+    doc.setTextColor(30, 41, 59);
+    doc.text("6. CLIENT ACCEPTANCE SIGNATURE", margin, sigY);
+    
+    doc.setFont("Helvetica", "normal");
+    doc.setFontSize(8);
+    doc.text("By signing below, both parties confirm authorization and acceptance of the takeoff requirements.", margin, sigY + 5);
+
+    let blocksY = sigY + 10;
+
+    // Left Signature Block (Contractor)
+    doc.setDrawColor(200, 200, 200);
+    doc.setLineWidth(0.5);
+    doc.line(margin, blocksY + 30, margin + 70, blocksY + 30);
+    
+    doc.setFont("Helvetica", "bold");
+    doc.setFontSize(9);
+    doc.setTextColor(71, 85, 105);
+    doc.text(proposalPreparedBy, margin, blocksY + 35);
+    doc.setFont("Helvetica", "normal");
+    doc.setFontSize(8);
+    doc.text("Contractor Representative", margin, blocksY + 39);
+
+    if (contractorSignatureUrl) {
+      try {
+        doc.addImage(contractorSignatureUrl, 'PNG', margin + 5, blocksY + 2, 50, 25);
+      } catch (err) {
+        console.error(err);
+      }
+    }
+
+    // Right Signature Block (Client)
+    doc.line(pageWidth - margin - 70, blocksY + 30, pageWidth - margin, blocksY + 30);
+    
+    doc.setFont("Helvetica", "bold");
+    doc.setFontSize(9);
+    doc.setTextColor(71, 85, 105);
+    doc.text(proposalPreparedFor || "Authorized Client Signature", pageWidth - margin - 70, blocksY + 35);
+    doc.setFont("Helvetica", "normal");
+    doc.setFontSize(8);
+    doc.text(`Date of Signature: ${proposalSignatureDate || '__________________'}`, pageWidth - margin - 70, blocksY + 39);
+
+    if (clientSignatureUrl) {
+      try {
+        doc.addImage(clientSignatureUrl, 'PNG', pageWidth - margin - 65, blocksY + 2, 50, 25);
+      } catch (err) {
+        console.error(err);
+      }
+    }
+
+    drawContentFooter(4);
+    return doc;
+  };
+
+  const handleSendQuote = async () => {
+    if (!customerEmail.trim()) {
+      toast.error("Please enter a valid email address.");
+      return;
+    }
+    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+    if (!emailRegex.test(customerEmail.trim())) {
+      toast.error("Please enter a valid email address.");
+      return;
+    }
+
+    setIsSendingEmail(true);
+    const loadingToast = toast.info("Compiling PDF and sending via SendGrid...", { autoClose: false });
+    try {
+      let tablesJsonObj = selectedPage?.output_json;
+      if (typeof tablesJsonObj === 'string') {
+        try {
+          tablesJsonObj = JSON.parse(tablesJsonObj);
+        } catch {
+          tablesJsonObj = {};
+        }
+      }
+
+      let finalTablesJson = tablesJsonObj;
+      if (tablesJsonObj && !tablesJsonObj.tables) {
+        finalTablesJson = {
+          tables: tablesJsonObj.tables_json?.tables || tablesJsonObj.json_data?.tables || tablesJsonObj || []
+        };
+      }
+
+      // Recompile markdown text dynamically from template proposal fields
+      const compiledMarkdown = `# CONSTRUCTION PROPOSAL & BUDGET ESTIMATE
+
+## COVER PAGE
+- **Date:** ${templateMetadata.date}
+- **Project ID:** ${templateMetadata.projectId}
+- **Address:** ${templateMetadata.address}
+- **Prepared For:** ${proposalPreparedFor}
+- **Prepared By:** ${proposalPreparedBy}
+- **Drawing Reference:** ${templateMetadata.drawingRef}
+- **Scale:** ${templateMetadata.scale}
+
+---
+
+## 1. PROJECT SUMMARY
+${proposalSummary}
+
+---
+
+## 2. SCOPE OF WORK
+${proposalScope}
+
+---
+
+## 3. PROJECT TIMELINE & MILESTONES
+- **Target Duration:** ${proposalTimelineDuration}
+- **Estimated Start:** ${proposalTimelineStart}
+
+${proposalTimelineNotes}
+
+---
+
+## 4. WARRANTY TERMS & CONDITIONS
+- **Warranty Period:** ${proposalWarrantyPeriod}
+
+${proposalWarrantyTerms}
+
+---
+
+## 5. FINANCIAL BUDGET BREAKDOWN
+${proposalPricingText}
+
+- **Subtotal (Takeoff Base Cost):** $${proposalPricingSubtotal.toLocaleString()}
+- **Overhead & Profit:** $${proposalPricingOverhead.toLocaleString()}
+- **Contingency:** $${proposalPricingContingency.toLocaleString()}
+- **Insurance / Taxes:** $${proposalPricingTax.toLocaleString()}
+- **TOTAL CONTRACT VALUE: $${proposalPricingTotal.toLocaleString()}**
+
+---
+
+## 6. CLIENT ACCEPTANCE SIGNATURE
+*By signing below, the client representative accepts this proposal.*
+
+**Contractor Signature:** __________________________ (Prepared By: ${proposalPreparedBy})
+**Client Signature:** __________________________ (Prepared For: ${proposalPreparedFor})
+**Date of Signature:** ${proposalSignatureDate || '__________________________'}`;
+
+      const payload = {
+        email: customerEmail.trim(),
+        status: true,
+        estimate_text: compiledMarkdown,
+        tables_json: finalTablesJson,
+        logo: logoUrl,
+        contractor_signature: contractorSignatureUrl,
+        client_signature: clientSignatureUrl
+      };
+
+      // 1. Send to audit quote API
+      const response = await fetch('https://paybue-quee.hnhsofttechsolutions.com/quote', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify(payload)
+      });
+
+      if (!response.ok) {
+        throw new Error(`HTTP error! status: ${response.status}`);
+      }
+
+      // 2. Generate PDF and send via SendGrid API
+      const doc = generateProposalPDF();
+      const pdfBase64 = doc.output('datauristring').split(',')[1];
+      
+      const apiKey = import.meta.env.VITE_SENDGRID_API_KEY;
+
+      const sendGridBase = import.meta.env.DEV 
+        ? '/api-sendgrid' 
+        : 'https://corsproxy.io/?https://api.sendgrid.com';
+
+      const sendGridResponse = await fetch(`${sendGridBase}/v3/mail/send`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${apiKey}`
+        },
+        body: JSON.stringify({
+          personalizations: [
+            {
+              to: [{ email: customerEmail.trim() }],
+              subject: `Construction Proposal & Budget Estimate - Project #${templateMetadata.projectId || 'Estimate'}`
+            }
+          ],
+          from: {
+            email: 'support@constil.com',
+            name: 'CONSTIL Estimating Portal'
+          },
+          content: [
+            {
+              type: 'text/html',
+              value: `
+                <div style="font-family: Arial, sans-serif; line-height: 1.6; color: #333; max-width: 600px; margin: 0 auto; border: 1px solid #e2e8f0; border-radius: 12px; padding: 24px; background-color: #ffffff;">
+                  <h2 style="color: #448AFF; margin-top: 0; font-size: 20px; border-bottom: 2px solid #edf2f7; padding-bottom: 12px;">Construction Proposal & Budget Estimate</h2>
+                  <p>Hello,</p>
+                  <p>We are pleased to submit our construction proposal and budget estimate for project <strong>#${templateMetadata.projectId || 'Estimate'}</strong>.</p>
+                  <p>A detailed professional PDF copy has been generated and attached to this email for your review and sign-off.</p>
+                  <hr style="border: 0; border-top: 1px solid #edf2f7; margin: 20px 0;" />
+                  <p style="font-size: 11px; color: #718096; text-align: center;">Sent securely via CONSTIL Estimating Portal.</p>
+                </div>
+              `
+            }
+          ],
+          attachments: [
+            {
+              content: pdfBase64,
+              filename: `Proposal_${templateMetadata.projectId || 'Estimate'}.pdf`,
+              type: 'application/pdf',
+              disposition: 'attachment'
+            }
+          ]
+        })
+      });
+
+      if (!sendGridResponse.ok) {
+        const errText = await sendGridResponse.text();
+        console.error("[SENDGRID ERROR] SendGrid response:", errText);
+        throw new Error(`SendGrid API error! status: ${sendGridResponse.status}`);
+      }
+
+      toast.dismiss(loadingToast);
+      toast.success("Proposal PDF emailed to customer successfully!");
+      setShowEmailModal(false);
+      setShowFinalResultModal(false);
+      setCustomerEmail('');
+    } catch (err: any) {
+      console.error("[SEND QUOTE] Error:", err);
+      toast.dismiss(loadingToast);
+      toast.error(err.message || "Failed to email quote. Please try again.");
+    } finally {
+      setIsSendingEmail(false);
     }
   };
 
@@ -460,7 +1093,12 @@ const File = () => {
 
   const exportPDF = () => {
     try {
-    const doc = new jsPDF('l', 'mm', 'a4');
+    const doc = new jsPDF({
+      orientation: 'l',
+      unit: 'mm',
+      format: 'a4',
+      compress: true
+    });
     let currentY = 20;
 
     tables.forEach((table) => {
@@ -677,7 +1315,13 @@ const File = () => {
         // --- Real-time Recalculation Logic ---
         const parseNum = (v: any) => parseFloat(v?.toString().replace(/[$,% ]/g, '') || '0');
         
-        if (key === 'Quantity' || key === 'Wastage %' || key === 'Unit Material' || key === 'Unit Labor') {
+        const normKey = key.toLowerCase();
+        if (
+          normKey.includes('quantity') || 
+          normKey.includes('wastage') || 
+          normKey.includes('unit material') || 
+          normKey.includes('unit labor')
+        ) {
           const qty = parseNum(row['Quantity'] || row['QUANTITY']);
           const wastage = parseNum(row['Wastage %'] || row['WASTAGE %']) / 100;
           const unitMat = parseNum(row['Unit Material'] || row['UNIT MATERIAL']);
@@ -708,6 +1352,64 @@ const File = () => {
 
       return updated;
     });
+  };
+
+  const applyBulkWastage = (tableIndex: number, value: string) => {
+    if (!value.trim()) return;
+    
+    const parsedVal = value.replace(/%/g, '').trim();
+    if (isNaN(Number(parsedVal))) {
+      toast.error("Please enter a valid number for wastage (e.g. 6 or 6%)");
+      return;
+    }
+    
+    setSelectedPage((prev: any) => {
+      if (!prev?.output_json) return prev;
+      const updated = structuredClone(prev);
+      const data = updated.output_json;
+
+      let targetTables = null;
+      if (Array.isArray(data.tables)) targetTables = data.tables;
+      else if (Array.isArray(data.tables_json?.tables)) targetTables = data.tables_json.tables;
+      else if (Array.isArray(data.json_data?.tables)) targetTables = data.json_data.tables;
+
+      if (targetTables && targetTables[tableIndex]) {
+        const rows = targetTables[tableIndex].rows;
+        
+        rows.forEach((row: any) => {
+          const wastageKey = Object.keys(row).find(k => k.toLowerCase().includes('wastage'));
+          if (wastageKey) {
+            row[wastageKey] = `${parsedVal}%`;
+            
+            const parseNum = (v: any) => parseFloat(v?.toString().replace(/[$,% ]/g, '') || '0');
+            const qty = parseNum(row['Quantity'] || row['QUANTITY']);
+            const wastage = parseNum(parsedVal) / 100;
+            const unitMat = parseNum(row['Unit Material'] || row['UNIT MATERIAL']);
+            const unitLab = parseNum(row['Unit Labor'] || row['UNIT LABOR']);
+            
+            const qtyWithWastage = qty * (1 + wastage);
+            
+            const qtyWastageKey = Object.keys(row).find(k => k.toLowerCase().includes('qty w/') || k.toLowerCase().includes('qty with'));
+            if (qtyWastageKey) row[qtyWastageKey] = Math.round(qtyWithWastage);
+
+            const totalMatKey = Object.keys(row).find(k => k.toLowerCase() === 'total material');
+            if (totalMatKey) row[totalMatKey] = `$${(qtyWithWastage * unitMat).toLocaleString(undefined, { maximumFractionDigits: 0 })}`;
+
+            const totalLabKey = Object.keys(row).find(k => k.toLowerCase() === 'total labor');
+            if (totalLabKey) row[totalLabKey] = `$${(qtyWithWastage * unitLab).toLocaleString(undefined, { maximumFractionDigits: 0 })}`;
+
+            const totalCostKey = Object.keys(row).find(k => ['Total Cost', 'TOTAL COST', 'Amount', 'Total'].includes(k));
+            if (totalCostKey) {
+              const finalTotal = (qtyWithWastage * unitMat) + (qtyWithWastage * unitLab);
+              row[totalCostKey] = `$${finalTotal.toLocaleString(undefined, { maximumFractionDigits: 0 })}`;
+            }
+          }
+        });
+      }
+      
+      return updated;
+    });
+    toast.success(`Updated wastage to ${parsedVal}% for all rows in this table`);
   };
 
   const getFormulaHint = (header: string, tableName: string) => {
@@ -779,8 +1481,124 @@ const File = () => {
 
                 <div className="flex flex-wrap gap-2 shrink-0">
                   <button
+                    disabled={isGeneratingProposal}
+                    onClick={async () => {
+                      setIsGeneratingProposal(true);
+                      const loadingToast = toast.info("Generating professional proposal layout from API...", { autoClose: false });
+                      try {
+                        const markdown = selectedPage?.output_markdown || '';
+                        
+                        let tablesJsonObj = selectedPage?.output_json;
+                        if (typeof tablesJsonObj === 'string') {
+                          try {
+                            tablesJsonObj = JSON.parse(tablesJsonObj);
+                          } catch {
+                            tablesJsonObj = {};
+                          }
+                        }
+
+                        let finalTablesJson = tablesJsonObj;
+                        if (tablesJsonObj && !tablesJsonObj.tables) {
+                          finalTablesJson = {
+                            tables: tablesJsonObj.tables_json?.tables || tablesJsonObj.json_data?.tables || tablesJsonObj || []
+                          };
+                        }
+
+                        // Make API call to fetch proposal template data
+                        const response = await fetch('https://paybue-quee.hnhsofttechsolutions.com/quote', {
+                          method: 'POST',
+                          headers: {
+                            'Content-Type': 'application/json'
+                          },
+                          body: JSON.stringify({
+                            status: true,
+                            estimate_text: markdown,
+                            tables_json: finalTablesJson
+                          })
+                        });
+
+                        if (!response.ok) {
+                          throw new Error(`API returned status ${response.status}`);
+                        }
+
+                        const resData = await response.json();
+                        const proposalData = resData?.proposal?.data;
+
+                        if (!proposalData) {
+                          throw new Error("No proposal data returned from API.");
+                        }
+
+                        // Parse metadata
+                        const lines = markdown.split('\n');
+                        const metadata = {
+                          date: '',
+                          projectId: '',
+                          address: '',
+                          scope: '',
+                          drawingRef: '',
+                          scale: ''
+                        };
+
+                        for (const line of lines) {
+                          const cleanLine = line.trim();
+                          
+                          const dateMatch = cleanLine.match(/^\*\*Date\s*:\*\*(.*)$/i);
+                          const projectMatch = cleanLine.match(/^\*\*Project ID\s*:\*\*(.*)$/i);
+                          const addressMatch = cleanLine.match(/^\*\*Address\s*:\*\*(.*)$/i);
+                          const scopeMatch = cleanLine.match(/^\*\*Scope\s*:\*\*(.*)$/i);
+                          const drawingMatch = cleanLine.match(/^\*\*Drawing Reference\s*:\*\*(.*)$/i);
+                          const scaleMatch = cleanLine.match(/^\*\*Scale\s*:\*\*(.*)$/i);
+
+                          if (dateMatch) {
+                            metadata.date = dateMatch[1].trim();
+                          } else if (projectMatch) {
+                            metadata.projectId = projectMatch[1].trim();
+                          } else if (addressMatch) {
+                            metadata.address = addressMatch[1].trim();
+                          } else if (scopeMatch) {
+                            metadata.scope = scopeMatch[1].trim();
+                          } else if (drawingMatch) {
+                            metadata.drawingRef = drawingMatch[1].trim();
+                          } else if (scaleMatch) {
+                            metadata.scale = scaleMatch[1].trim();
+                          }
+                        }
+
+                        setTemplateMetadata(metadata);
+                        setProposalSummary(proposalData.project_summary || '');
+                        setProposalScope(proposalData.scope_of_work || '');
+                        setProposalTimelineNotes(proposalData.timeline || '');
+                        setProposalWarrantyTerms(proposalData.warranty || '');
+                        setProposalPricingText(proposalData.pricing || '');
+                        setProposalSignatureDate(metadata.date || new Date().toLocaleDateString());
+
+                        const sub = totalEstimate || 0;
+                        setProposalPricingSubtotal(sub);
+                        setProposalPricingTax(Math.round(sub * 0.05));
+                        setProposalPricingContingency(Math.round(sub * 0.05));
+                        setProposalPricingOverhead(Math.round(sub * 0.20));
+                        setProposalPricingTotal(sub + Math.round(sub * 0.05) * 2 + Math.round(sub * 0.20));
+
+                        toast.dismiss(loadingToast);
+                        toast.success("Proposal layout generated!");
+
+                        setActiveTab('cover');
+                        setShowFinalResultModal(true);
+                      } catch (err: any) {
+                        console.error("[GENERATE PROPOSAL] Error:", err);
+                        toast.dismiss(loadingToast);
+                        toast.error(err.message || "Failed to generate proposal layout from API.");
+                      } finally {
+                        setIsGeneratingProposal(false);
+                      }
+                    }}
+                    className="px-4 py-2 text-sm border border-[#448AFF] text-[#448AFF] rounded-lg bg-white hover:bg-blue-50 font-semibold cursor-pointer disabled:opacity-60"
+                  >
+                    {isGeneratingProposal ? "Generating..." : "Final Result"}
+                  </button>
+                  <button
                     onClick={toggleAllTables}
-                    className="px-3 py-2 text-sm border border-gray-200 rounded-lg bg-white hover:bg-gray-50"
+                    className="px-3 py-2 text-sm border border-gray-200 rounded-lg bg-white hover:bg-gray-50 cursor-pointer"
                   >
                     {allExpanded ? 'Collapse all' : 'Expand all'}
                   </button>
@@ -914,6 +1732,39 @@ const File = () => {
 
                       {isExpanded && (
                         <div className="border-t border-gray-100">
+                          {!table.table_name.toLowerCase().includes('summary') && (
+                            <div className="bg-gray-50/50 px-5 py-2.5 border-b border-gray-100 flex flex-wrap items-center gap-3 justify-end">
+                              <span className="text-xs font-semibold text-gray-500">Bulk Update:</span>
+                              <div className="flex items-center gap-1.5">
+                                <input
+                                  type="text"
+                                  placeholder="Wastage (e.g. 6%)"
+                                  id={`bulk-wastage-${idx}`}
+                                  className="border border-gray-200 rounded-md px-2.5 py-1.5 text-xs bg-white w-32 outline-none focus:border-primary focus:ring-1 focus:ring-primary/30"
+                                  onKeyDown={(e) => {
+                                    if (e.key === 'Enter') {
+                                      const val = (e.target as HTMLInputElement).value;
+                                      applyBulkWastage(idx, val);
+                                      (e.target as HTMLInputElement).value = '';
+                                    }
+                                  }}
+                                />
+                                <button
+                                  type="button"
+                                  onClick={() => {
+                                    const input = document.getElementById(`bulk-wastage-${idx}`) as HTMLInputElement;
+                                    if (input) {
+                                      applyBulkWastage(idx, input.value);
+                                      input.value = '';
+                                    }
+                                  }}
+                                  className="px-3 py-1.5 bg-[#448AFF] hover:bg-[#3d7ef7] text-white text-xs font-semibold rounded-md shadow-sm active:scale-95 transition-all cursor-pointer"
+                                >
+                                  Apply to Table
+                                </button>
+                              </div>
+                            </div>
+                          )}
                           <div className="overflow-x-auto max-h-[min(70vh,720px)] overflow-y-auto thin-scrollbar">
                             <table className="w-full min-w-[900px] border-collapse text-sm">
                               <thead className="sticky top-0 z-10">
@@ -1074,6 +1925,22 @@ const File = () => {
               </button>
             </header>
 
+            {rawChatHistory.length > 0 && (
+              <div className="bg-purple-50 border-b border-purple-100/80 px-4 py-2.5 flex items-center justify-between shadow-sm animate-in fade-in slide-in-from-top-2 duration-200 shrink-0">
+                <div className="min-w-0">
+                  <p className="text-xs font-semibold text-purple-900">Unapplied Changes</p>
+                  <p className="text-[10px] text-purple-700 mt-0.5">Apply conversation changes to the sheet</p>
+                </div>
+                <button
+                  onClick={sendConversationToAI}
+                  className="px-3 py-1.5 text-xs bg-purple-600 hover:bg-purple-700 text-white rounded-lg font-semibold flex items-center gap-1 transition-all active:scale-95 shadow-md shrink-0 cursor-pointer"
+                >
+                  <Check size={12} />
+                  Apply to Sheet
+                </button>
+              </div>
+            )}
+
             <div className="flex-1 overflow-y-auto thin-scrollbar bg-slate-50/80 px-4 py-4 space-y-4">
               {chatMessages.length === 0 ? (
                 <div className="flex h-full min-h-[200px] flex-col items-center justify-center text-center px-2">
@@ -1100,7 +1967,30 @@ const File = () => {
                     >
                       {m.from === 'bot' ? (
                         <div className="prose prose-sm prose-gray max-w-none [&_p]:my-1 [&_ul]:my-1 [&_ol]:my-1">
-                          <ReactMarkdown remarkPlugins={[remarkGfm]}>{m.text}</ReactMarkdown>
+                          <ReactMarkdown
+                            remarkPlugins={[remarkGfm]}
+                            components={{
+                              table: ({ node, ...props }: any) => (
+                                <div className="w-full overflow-x-auto my-2 border border-gray-200 rounded-lg max-w-full thin-scrollbar">
+                                  <table className="min-w-full divide-y divide-gray-200 text-xs border-collapse" {...props} />
+                                </div>
+                              ),
+                              thead: ({ node, ...props }: any) => (
+                                <thead className="bg-gray-50" {...props} />
+                              ),
+                              th: ({ node, ...props }: any) => (
+                                <th className="px-3 py-2 text-left font-semibold text-gray-600 uppercase tracking-wider whitespace-nowrap border-b border-gray-200" {...props} />
+                              ),
+                              td: ({ node, ...props }: any) => (
+                                <td className="px-3 py-2 text-gray-700 whitespace-nowrap border-b border-gray-100 align-middle" {...props} />
+                              ),
+                              tr: ({ node, ...props }: any) => (
+                                <tr className="hover:bg-gray-50 transition-colors" {...props} />
+                              )
+                            }}
+                          >
+                            {m.text}
+                          </ReactMarkdown>
                         </div>
                       ) : (
                         <p className="whitespace-pre-wrap break-words">{m.text}</p>
@@ -1123,14 +2013,36 @@ const File = () => {
             </div>
 
             <footer className="border-t border-gray-100 bg-white p-3">
-              <div className="flex items-end gap-2 rounded-xl border border-gray-200 bg-gray-50/80 px-3 py-2 focus-within:border-primary/40 focus-within:ring-2 focus-within:ring-primary/15 transition-shadow">
+              <div className={`flex items-end gap-2 rounded-xl border px-3 py-2 ${
+                isRecording 
+                  ? 'border-red-500 ring-2 ring-red-500/20 bg-red-50/30' 
+                  : 'border-gray-200 bg-gray-50/80 focus-within:border-primary/40 focus-within:ring-2 focus-within:ring-primary/15'
+              }`}>
+                <button
+                  type="button"
+                  onClick={isRecording ? stopSpeechToText : startSpeechToText}
+                  disabled={chatSending}
+                  className={`flex h-9 w-9 shrink-0 items-center justify-center rounded-lg cursor-pointer ${
+                    isRecording 
+                      ? 'bg-red-500 text-white' 
+                      : 'text-gray-400 hover:text-gray-600 hover:bg-gray-100 disabled:opacity-40'
+                  }`}
+                  title={isRecording ? "Stop recording" : "Record voice note"}
+                >
+                  {isRecording ? (
+                    <MicOff className="h-4 w-4" />
+                  ) : (
+                    <Mic className="h-4 w-4" />
+                  )}
+                </button>
                 <textarea
+                  ref={textareaRef}
                   value={chatInput}
                   onChange={(e) => setChatInput(e.target.value)}
-                  placeholder="Message the assistant…"
+                  placeholder={isRecording ? "Listening... Speak now" : "Message the assistant…"}
                   rows={1}
                   disabled={chatSending}
-                  className="flex-1 max-h-24 resize-none bg-transparent text-sm text-gray-900 placeholder:text-gray-400 outline-none disabled:opacity-60"
+                  className="flex-1 max-h-24 resize-none bg-transparent text-sm text-gray-900 placeholder:text-gray-400 outline-none disabled:opacity-60 py-1 overflow-y-auto thin-scrollbar"
                   onKeyDown={(e) => {
                     if (e.key === 'Enter' && !e.shiftKey) {
                       e.preventDefault();
@@ -1141,8 +2053,8 @@ const File = () => {
                 <button
                   type="button"
                   onClick={sendMessage}
-                  disabled={!chatInput.trim() || chatSending}
-                  className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-primary text-white hover:opacity-90 disabled:opacity-40 disabled:cursor-not-allowed transition-opacity"
+                  disabled={!chatInput.trim() || chatSending || isRecording}
+                  className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-primary text-white hover:opacity-90 disabled:opacity-40 disabled:cursor-not-allowed transition-opacity cursor-pointer"
                   aria-label="Send message"
                 >
                   {chatSending ? (
@@ -1153,7 +2065,7 @@ const File = () => {
                 </button>
               </div>
               <p className="mt-2 text-center text-[10px] text-gray-400">
-                Enter to send · Shift+Enter for new line
+                {isRecording ? "Click the microphone again to stop and review" : "Enter to send · Shift+Enter for new line"}
               </p>
             </footer>
           </div>
@@ -1167,6 +2079,578 @@ const File = () => {
               <div className="bg-blue-600 h-3 rounded-full transition-all" style={{ width: `${progress}%` }} />
             </div>
             <p className="text-center text-xs mt-2">{progress}%</p>
+          </div>
+        </div>
+      )}
+
+      {showFinalResultModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/60 p-4 overflow-y-auto thin-scrollbar animate-in fade-in duration-100">
+          <div className="bg-slate-100 rounded-2xl shadow-2xl border border-slate-200 max-w-5xl w-full max-h-[95vh] flex flex-col overflow-hidden animate-in zoom-in-95 duration-100">
+            {/* Modal Header */}
+            <div className="px-6 py-4 bg-white border-b border-gray-100 flex items-center justify-between shadow-sm z-10">
+              <div>
+                <h2 className="text-lg font-bold text-gray-900 flex items-center gap-2">
+                  <Sparkles className="w-5 h-5 text-primary" />
+                  Proposal Document Editor
+                </h2>
+                <p className="text-xs text-gray-500 mt-0.5">Prepare, customize, and edit the final proposal before sending to your client.</p>
+              </div>
+              <button
+                onClick={() => setShowFinalResultModal(false)}
+                className="p-1.5 rounded-full hover:bg-gray-100 text-gray-400 hover:text-gray-600 transition-colors cursor-pointer"
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+
+            {/* Modal Body - Split Layout */}
+            <div className="flex-1 flex overflow-hidden bg-slate-100 min-h-[500px]">
+              {/* Left Sidebar - Pages List */}
+              <div className="w-56 bg-white border-r border-slate-200 p-4 flex flex-col gap-1.5 shrink-0 overflow-y-auto thin-scrollbar">
+                <span className="text-[10px] font-bold text-slate-400 uppercase tracking-widest px-2 mb-2">Proposal Sections</span>
+                {[
+                  { id: 'cover', label: 'Cover Page' },
+                  { id: 'summary', label: 'Project Summary' },
+                  { id: 'scope', label: 'Scope of Work' },
+                  { id: 'timeline', label: 'Timeline' },
+                  { id: 'warranty', label: 'Warranty' },
+                  { id: 'pricing', label: 'Pricing Summary' },
+                  { id: 'signature', label: 'Signature Page' },
+                ].map((tab) => (
+                  <button
+                    key={tab.id}
+                    onClick={() => setActiveTab(tab.id as any)}
+                    className={`flex items-center px-3 py-2 text-xs font-semibold rounded-lg transition-all text-left cursor-pointer ${
+                      activeTab === tab.id
+                        ? 'bg-primary text-white shadow-sm'
+                        : 'text-slate-600 hover:bg-slate-50 hover:text-slate-900'
+                    }`}
+                  >
+                    {tab.label}
+                  </button>
+                ))}
+              </div>
+
+              {/* Right Side - Paper Sheet Layout */}
+              <div className="flex-1 p-6 overflow-y-auto thin-scrollbar flex justify-center items-start">
+                <div className="bg-white shadow-lg border border-slate-200/60 rounded-xl p-8 max-w-3xl w-full min-h-[600px] flex flex-col justify-between">
+                  
+                  {/* TAB 1: COVER PAGE */}
+                  {activeTab === 'cover' && (
+                    <div className="flex-1 flex flex-col justify-between">
+                      {/* Top Header */}
+                      <div className="flex justify-between items-center border-b border-slate-100 pb-6">
+                        <div className="flex items-center gap-3">
+                          {logoUrl ? (
+                            <img src={logoUrl} alt="Company Logo" className="max-h-12 max-w-[120px] object-contain rounded-lg border border-slate-150 p-1" />
+                          ) : (
+                            <div className="h-12 w-12 rounded-lg bg-slate-50 border border-slate-200 border-dashed flex flex-col items-center justify-center text-[10px] text-slate-400">
+                              <span>No Logo</span>
+                            </div>
+                          )}
+                          <div>
+                            <h3 className="text-xl font-black text-slate-900 tracking-tight flex items-center gap-1.5">
+                              <Sparkles className="w-5 h-5 text-primary animate-pulse" />
+                              CONSTIL <span className="text-primary font-light">PROPOSAL</span>
+                            </h3>
+                            <p className="text-[9px] text-slate-400 uppercase tracking-widest mt-0.5">Professional Takeoff Document</p>
+                          </div>
+                        </div>
+                        <div className="flex flex-col items-end gap-1.5">
+                          <label className="cursor-pointer text-[10px] px-2 py-1 bg-slate-50 border border-slate-200 rounded hover:bg-slate-100 text-slate-600 transition-colors font-semibold shadow-sm">
+                            Upload Logo
+                            <input 
+                              type="file" 
+                              accept="image/*" 
+                              className="hidden" 
+                              onChange={(e) => {
+                                const file = e.target.files?.[0];
+                                if (file) {
+                                  const reader = new FileReader();
+                                  reader.onloadend = () => {
+                                    if (typeof reader.result === 'string') {
+                                      setLogoUrl(reader.result);
+                                    }
+                                  };
+                                  reader.readAsDataURL(file);
+                                }
+                              }}
+                            />
+                          </label>
+                        </div>
+                      </div>
+
+                      {/* Main Cover Title Block */}
+                      <div className="my-12 text-center space-y-6">
+                        <div className="inline-block px-3 py-1 bg-slate-100 text-slate-600 text-[10px] font-bold rounded-full uppercase tracking-wider">
+                          Official Proposal
+                        </div>
+                        <h1 className="text-3xl font-extrabold text-slate-900 tracking-tight leading-tight">
+                          Construction Takeoff &amp; Budget Estimate
+                        </h1>
+                        <p className="text-sm text-slate-500 max-w-md mx-auto">
+                          Detailed material quantification, pricing breakdown, and execution scope details.
+                        </p>
+                      </div>
+
+                      {/* Metadata Grid (Editable Inputs) */}
+                      <div className="grid grid-cols-1 md:grid-cols-2 gap-4 bg-slate-50 p-4 rounded-xl text-xs border border-slate-100">
+                        <div className="space-y-2">
+                          <div className="flex items-center gap-2">
+                            <span className="text-slate-400 font-medium w-24 shrink-0">Project ID:</span>
+                            <input 
+                              type="text" 
+                              value={templateMetadata.projectId} 
+                              onChange={(e) => {
+                                const val = e.target.value;
+                                setTemplateMetadata(prev => ({ ...prev, projectId: val }));
+                              }}
+                              className="flex-1 bg-white border border-slate-200 rounded px-2.5 py-1.5 outline-none focus:border-primary"
+                            />
+                          </div>
+                          <div className="flex items-center gap-2">
+                            <span className="text-slate-400 font-medium w-24 shrink-0">Date:</span>
+                            <input 
+                              type="text" 
+                              value={templateMetadata.date} 
+                              onChange={(e) => {
+                                const val = e.target.value;
+                                setTemplateMetadata(prev => ({ ...prev, date: val }));
+                              }}
+                              className="flex-1 bg-white border border-slate-200 rounded px-2.5 py-1.5 outline-none focus:border-primary"
+                            />
+                          </div>
+                          <div className="flex items-center gap-2">
+                            <span className="text-slate-400 font-medium w-24 shrink-0">Address:</span>
+                            <input 
+                              type="text" 
+                              value={templateMetadata.address} 
+                              onChange={(e) => {
+                                const val = e.target.value;
+                                setTemplateMetadata(prev => ({ ...prev, address: val }));
+                              }}
+                              className="flex-1 bg-white border border-slate-200 rounded px-2.5 py-1.5 outline-none focus:border-primary"
+                            />
+                          </div>
+                        </div>
+                        <div className="space-y-2">
+                          <div className="flex items-center gap-2">
+                            <span className="text-slate-400 font-medium w-24 shrink-0">Prepared For:</span>
+                            <input 
+                              type="text" 
+                              value={proposalPreparedFor} 
+                              onChange={(e) => setProposalPreparedFor(e.target.value)}
+                              placeholder="e.g. John Doe / Client Co"
+                              className="flex-1 bg-white border border-slate-200 rounded px-2.5 py-1.5 outline-none focus:border-primary"
+                            />
+                          </div>
+                          <div className="flex items-center gap-2">
+                            <span className="text-slate-400 font-medium w-24 shrink-0">Prepared By:</span>
+                            <input 
+                              type="text" 
+                              value={proposalPreparedBy} 
+                              onChange={(e) => setProposalPreparedBy(e.target.value)}
+                              className="flex-1 bg-white border border-slate-200 rounded px-2.5 py-1.5 outline-none focus:border-primary"
+                            />
+                          </div>
+                          <div className="flex items-center gap-2">
+                            <span className="text-slate-400 font-medium w-24 shrink-0">Scale / Ref:</span>
+                            <input 
+                              type="text" 
+                              value={templateMetadata.scale} 
+                              onChange={(e) => {
+                                const val = e.target.value;
+                                setTemplateMetadata(prev => ({ ...prev, scale: val }));
+                              }}
+                              className="flex-1 bg-white border border-slate-200 rounded px-2.5 py-1.5 outline-none focus:border-primary"
+                            />
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+                  )}
+
+                  {/* TAB 2: PROJECT SUMMARY */}
+                  {activeTab === 'summary' && (
+                    <div className="flex-1 flex flex-col justify-between">
+                      <div className="border-b border-slate-100 pb-4 mb-4">
+                        <h3 className="text-base font-bold text-slate-900">Project Summary</h3>
+                        <p className="text-xs text-slate-500">Provide an overview description of the takeoff project.</p>
+                      </div>
+                      <textarea
+                        value={proposalSummary}
+                        onChange={(e) => setProposalSummary(e.target.value)}
+                        className="flex-1 w-full border border-slate-200 rounded-xl p-4 text-xs text-slate-800 focus:border-primary focus:ring-1 focus:ring-primary/20 outline-none resize-none thin-scrollbar min-h-[350px] bg-slate-50/20"
+                        placeholder="Detailed project summary..."
+                      />
+                    </div>
+                  )}
+
+                  {/* TAB 3: SCOPE OF WORK */}
+                  {activeTab === 'scope' && (
+                    <div className="flex-1 flex flex-col justify-between">
+                      <div className="border-b border-slate-100 pb-4 mb-4">
+                        <h3 className="text-base font-bold text-slate-900">Scope of Work</h3>
+                        <p className="text-xs text-slate-500">Outline specifications, drawings and material scopes covered.</p>
+                      </div>
+                      <textarea
+                        value={proposalScope}
+                        onChange={(e) => setProposalScope(e.target.value)}
+                        className="flex-1 w-full border border-slate-200 rounded-xl p-4 text-xs text-slate-800 focus:border-primary focus:ring-1 focus:ring-primary/20 outline-none resize-none thin-scrollbar min-h-[350px] bg-slate-50/20"
+                        placeholder="Define work boundaries and specs..."
+                      />
+                    </div>
+                  )}
+
+                  {/* TAB 4: TIMELINE */}
+                  {activeTab === 'timeline' && (
+                    <div className="flex-1 flex flex-col justify-between gap-4">
+                      <div className="border-b border-slate-100 pb-4">
+                        <h3 className="text-base font-bold text-slate-900">Timeline &amp; Schedule</h3>
+                        <p className="text-xs text-slate-500">Specify expected execution dates, project duration and milestones.</p>
+                      </div>
+                      
+                      <div className="grid grid-cols-2 gap-4">
+                        <div className="flex flex-col gap-1.5">
+                          <label className="text-[10px] font-semibold text-slate-400 uppercase">Target Duration</label>
+                          <input
+                            type="text"
+                            value={proposalTimelineDuration}
+                            onChange={(e) => setProposalTimelineDuration(e.target.value)}
+                            className="bg-slate-50 border border-slate-200 rounded-xl px-3 py-2 text-xs outline-none focus:bg-white focus:border-primary"
+                          />
+                        </div>
+                        <div className="flex flex-col gap-1.5">
+                          <label className="text-[10px] font-semibold text-slate-400 uppercase">Estimated Start</label>
+                          <input
+                            type="text"
+                            value={proposalTimelineStart}
+                            onChange={(e) => setProposalTimelineStart(e.target.value)}
+                            className="bg-slate-50 border border-slate-200 rounded-xl px-3 py-2 text-xs outline-none focus:bg-white focus:border-primary"
+                          />
+                        </div>
+                      </div>
+
+                      <div className="flex-1 flex flex-col gap-1.5">
+                        <label className="text-[10px] font-semibold text-slate-400 uppercase">Milestones / Schedule Notes</label>
+                        <textarea
+                          value={proposalTimelineNotes}
+                          onChange={(e) => setProposalTimelineNotes(e.target.value)}
+                          className="flex-1 w-full border border-slate-200 rounded-xl p-4 text-xs text-slate-800 focus:border-primary focus:ring-1 focus:ring-primary/20 outline-none resize-none thin-scrollbar min-h-[200px] bg-slate-50/20"
+                          placeholder="Project phases, milestones..."
+                        />
+                      </div>
+                    </div>
+                  )}
+
+                  {/* TAB 5: WARRANTY */}
+                  {activeTab === 'warranty' && (
+                    <div className="flex-1 flex flex-col justify-between gap-4">
+                      <div className="border-b border-slate-100 pb-4">
+                        <h3 className="text-base font-bold text-slate-900">Warranty Coverage</h3>
+                        <p className="text-xs text-slate-500">Provide details about labor/workmanship guarantees or product warranties.</p>
+                      </div>
+
+                      <div className="flex flex-col gap-1.5">
+                        <label className="text-[10px] font-semibold text-slate-400 uppercase">Warranty Period</label>
+                        <input
+                          type="text"
+                          value={proposalWarrantyPeriod}
+                          onChange={(e) => setProposalWarrantyPeriod(e.target.value)}
+                          className="bg-slate-50 border border-slate-200 rounded-xl px-3 py-2 text-xs outline-none focus:bg-white focus:border-primary"
+                        />
+                      </div>
+
+                      <div className="flex-1 flex flex-col gap-1.5">
+                        <label className="text-[10px] font-semibold text-slate-400 uppercase">Warranty Terms</label>
+                        <textarea
+                          value={proposalWarrantyTerms}
+                          onChange={(e) => setProposalWarrantyTerms(e.target.value)}
+                          className="flex-1 w-full border border-slate-200 rounded-xl p-4 text-xs text-slate-800 focus:border-primary focus:ring-1 focus:ring-primary/20 outline-none resize-none thin-scrollbar min-h-[220px] bg-slate-50/20"
+                          placeholder="Warranty terms and exclusions..."
+                        />
+                      </div>
+                    </div>
+                  )}
+
+                  {/* TAB 6: PRICING */}
+                  {activeTab === 'pricing' && (
+                    <div className="flex-1 flex flex-col justify-between gap-4">
+                      <div className="border-b border-slate-100 pb-4">
+                        <h3 className="text-base font-bold text-slate-900">Proposal Budget Summary</h3>
+                        <p className="text-xs text-slate-500">Live financial values from estimate. Edit fields as necessary.</p>
+                      </div>
+
+                      <div className="space-y-3 bg-slate-50 p-4 rounded-xl border border-slate-100">
+                        <div className="flex justify-between items-center text-xs">
+                          <span className="text-slate-500 font-medium">Subtotal (Takeoff Base Cost):</span>
+                          <div className="flex items-center gap-1.5">
+                            <span className="text-slate-400 font-semibold">$</span>
+                            <input
+                              type="number"
+                              value={proposalPricingSubtotal}
+                              onChange={(e) => setProposalPricingSubtotal(Number(e.target.value))}
+                              className="w-28 bg-white border border-slate-200 rounded px-2.5 py-1 text-right font-mono"
+                            />
+                          </div>
+                        </div>
+                        <div className="flex justify-between items-center text-xs">
+                          <span className="text-slate-500 font-medium">Overhead &amp; Profit (20% default):</span>
+                          <div className="flex items-center gap-1.5">
+                            <span className="text-slate-400 font-semibold">$</span>
+                            <input
+                              type="number"
+                              value={proposalPricingOverhead}
+                              onChange={(e) => setProposalPricingOverhead(Number(e.target.value))}
+                              className="w-28 bg-white border border-slate-200 rounded px-2.5 py-1 text-right font-mono"
+                            />
+                          </div>
+                        </div>
+                        <div className="flex justify-between items-center text-xs">
+                          <span className="text-slate-500 font-medium">Contingency (5% default):</span>
+                          <div className="flex items-center gap-1.5">
+                            <span className="text-slate-400 font-semibold">$</span>
+                            <input
+                              type="number"
+                              value={proposalPricingContingency}
+                              onChange={(e) => setProposalPricingContingency(Number(e.target.value))}
+                              className="w-28 bg-white border border-slate-200 rounded px-2.5 py-1 text-right font-mono"
+                            />
+                          </div>
+                        </div>
+                        <div className="flex justify-between items-center text-xs">
+                          <span className="text-slate-500 font-medium">Insurance / Taxes (5% default):</span>
+                          <div className="flex items-center gap-1.5">
+                            <span className="text-slate-400 font-semibold">$</span>
+                            <input
+                              type="number"
+                              value={proposalPricingTax}
+                              onChange={(e) => setProposalPricingTax(Number(e.target.value))}
+                              className="w-28 bg-white border border-slate-200 rounded px-2.5 py-1 text-right font-mono"
+                            />
+                          </div>
+                        </div>
+                        <div className="border-t border-slate-200 pt-3 flex justify-between items-center font-bold text-slate-900">
+                          <span>Total Proposal Budget:</span>
+                          <span className="font-mono text-primary">${proposalPricingTotal.toLocaleString()}</span>
+                        </div>
+                      </div>
+                      <div className="flex flex-col gap-1.5 mt-2">
+                        <label className="text-[10px] font-semibold text-slate-400 uppercase">Pricing Description / Terms</label>
+                        <textarea
+                          value={proposalPricingText}
+                          onChange={(e) => setProposalPricingText(e.target.value)}
+                          className="w-full border border-slate-200 rounded-xl p-4 text-xs text-slate-800 focus:border-primary focus:ring-1 focus:ring-primary/20 outline-none resize-none thin-scrollbar min-h-[150px] bg-slate-50/20"
+                          placeholder="Detailed pricing notes and conditions..."
+                        />
+                      </div>
+                      <p className="text-[10px] text-slate-400 text-center italic mt-2">
+                        Values represent a synthesized summary of material and labor takeoff lines.
+                      </p>
+                    </div>
+                  )}
+
+                  {/* TAB 7: SIGNATURE PAGE */}
+                  {activeTab === 'signature' && (
+                    <div className="flex-1 flex flex-col justify-between">
+                      <div className="border-b border-slate-100 pb-4 mb-4">
+                        <h3 className="text-base font-bold text-slate-900">Authorization &amp; Signatures</h3>
+                        <p className="text-xs text-slate-500">Sign-off sheets for both client and contractor acceptance.</p>
+                      </div>
+
+                      <div className="my-6 text-xs text-slate-600 leading-relaxed space-y-4">
+                        <p>
+                          This proposal, containing the detailed pricing of <strong>${proposalPricingTotal.toLocaleString()}</strong>, 
+                          scope of work, schedule duration, and warranty commitments, constitutes the complete agreement 
+                          between the parties upon execution.
+                        </p>
+                        <p className="italic">
+                          By signing below, both parties confirm authorization and acceptance of the takeoff requirements.
+                        </p>
+                      </div>
+
+                      {/* Side by side signature blocks */}
+                      <div className="grid grid-cols-2 gap-8 mt-6">
+                        <div className="space-y-4">
+                          <div className="border-t border-slate-300 pt-3">
+                            <p className="text-[10px] font-bold text-slate-400 uppercase mb-2">Contractor Signature</p>
+                            
+                            {/* Signature preview / upload area */}
+                            <div className="h-24 bg-slate-50 border border-slate-200 border-dashed rounded-xl flex flex-col items-center justify-center overflow-hidden relative group mb-2">
+                              {contractorSignatureUrl ? (
+                                <img src={contractorSignatureUrl} alt="Contractor Signature" className="h-full w-full object-contain p-2" />
+                              ) : (
+                                <div className="text-center p-2 text-slate-400">
+                                  <span className="text-[10px] block">No contractor signature</span>
+                                </div>
+                              )}
+                              <label className="absolute inset-0 bg-black/40 text-white text-[10px] font-semibold flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity cursor-pointer">
+                                Upload Signature
+                                <input 
+                                  type="file" 
+                                  accept="image/*" 
+                                  className="hidden" 
+                                  onChange={(e) => {
+                                    const file = e.target.files?.[0];
+                                    if (file) {
+                                      const reader = new FileReader();
+                                      reader.onloadend = () => {
+                                        if (typeof reader.result === 'string') {
+                                          setContractorSignatureUrl(reader.result);
+                                        }
+                                      };
+                                      reader.readAsDataURL(file);
+                                    }
+                                  }}
+                                />
+                              </label>
+                            </div>
+                            
+                            <p className="text-xs font-semibold text-slate-700 mt-2 h-6 border-b border-slate-200 border-dashed">{proposalPreparedBy}</p>
+                            <p className="text-[10px] text-slate-500 mt-1">Authorized Representative</p>
+                          </div>
+                        </div>
+                        <div className="space-y-4">
+                          <div className="border-t border-slate-300 pt-3">
+                            <p className="text-[10px] font-bold text-slate-400 uppercase mb-2">Client Acceptance Signature</p>
+                            
+                            {/* Signature preview / upload area */}
+                            <div className="h-24 bg-slate-50 border border-slate-200 border-dashed rounded-xl flex flex-col items-center justify-center overflow-hidden relative group mb-2">
+                              {clientSignatureUrl ? (
+                                <img src={clientSignatureUrl} alt="Client Signature" className="h-full w-full object-contain p-2" />
+                              ) : (
+                                <div className="text-center p-2 text-slate-400">
+                                  <span className="text-[10px] block">No client signature</span>
+                                </div>
+                              )}
+                              <label className="absolute inset-0 bg-black/40 text-white text-[10px] font-semibold flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity cursor-pointer">
+                                Upload Signature
+                                <input 
+                                  type="file" 
+                                  accept="image/*" 
+                                  className="hidden" 
+                                  onChange={(e) => {
+                                    const file = e.target.files?.[0];
+                                    if (file) {
+                                      const reader = new FileReader();
+                                      reader.onloadend = () => {
+                                        if (typeof reader.result === 'string') {
+                                          setClientSignatureUrl(reader.result);
+                                        }
+                                      };
+                                      reader.readAsDataURL(file);
+                                    }
+                                  }}
+                                />
+                              </label>
+                            </div>
+
+                            <p className="text-xs font-semibold text-slate-700 mt-2 h-6 border-b border-slate-200 border-dashed">{proposalPreparedFor || "Authorized Client Signature"}</p>
+                            <div className="flex items-center gap-1.5 mt-2">
+                              <span className="text-[10px] text-slate-500 shrink-0">Date:</span>
+                              <input 
+                                type="text"
+                                placeholder="e.g. June 13, 2024"
+                                value={proposalSignatureDate}
+                                onChange={(e) => setProposalSignatureDate(e.target.value)}
+                                className="flex-1 bg-white border border-slate-200 rounded px-2 py-0.5 text-[10px] outline-none focus:border-primary"
+                              />
+                            </div>
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+                  )}
+
+                </div>
+              </div>
+            </div>
+
+            {/* Modal Footer */}
+            <div className="px-6 py-4 bg-white border-t border-gray-100 flex items-center justify-between shadow-sm z-10">
+              <button
+                onClick={() => setShowFinalResultModal(false)}
+                className="px-4 py-2 border border-gray-200 rounded-xl hover:bg-gray-50 text-sm font-semibold text-gray-600 cursor-pointer"
+              >
+                Close
+              </button>
+              <button
+                onClick={() => setShowEmailModal(true)}
+                className="px-5 py-2.5 bg-primary hover:bg-[#3d7ef7] text-white rounded-xl text-sm font-semibold shadow-md active:scale-95 transition-all flex items-center gap-1.5 cursor-pointer"
+              >
+                <Send className="w-4 h-4" />
+                Send to Customer
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {showEmailModal && (
+        <div className="fixed inset-0 z-[60] flex items-center justify-center bg-black/60 backdrop-blur-sm p-4 animate-in fade-in duration-200">
+          <div className="bg-white rounded-2xl shadow-2xl border border-gray-100 max-w-md w-full overflow-hidden transform transition-all duration-300 scale-100 animate-in zoom-in-95 duration-200">
+            {/* Modal Header */}
+            <div className="px-6 py-5 border-b border-gray-100 flex items-center justify-between bg-slate-50/50">
+              <div>
+                <h3 className="text-base font-bold text-gray-900">Send Estimate</h3>
+                <p className="text-xs text-gray-500 mt-1">Enter the customer's email address below.</p>
+              </div>
+              <button
+                onClick={() => setShowEmailModal(false)}
+                className="p-1.5 rounded-full hover:bg-gray-100 text-gray-400 hover:text-gray-600 transition-colors cursor-pointer"
+              >
+                <X className="w-4 h-4" />
+              </button>
+            </div>
+
+            {/* Modal Body */}
+            <div className="p-6">
+              <div className="space-y-4">
+                <div>
+                  <label htmlFor="customer-email-input" className="block text-xs font-semibold text-gray-500 uppercase tracking-wider mb-2">
+                    Customer Email Address
+                  </label>
+                  <input
+                    id="customer-email-input"
+                    type="email"
+                    required
+                    value={customerEmail}
+                    onChange={(e) => setCustomerEmail(e.target.value)}
+                    placeholder="e.g. customer@example.com"
+                    className="w-full px-4 py-3 border border-gray-200 rounded-xl text-sm focus:border-primary focus:ring-2 focus:ring-primary/20 outline-none"
+                    disabled={isSendingEmail}
+                  />
+                </div>
+              </div>
+            </div>
+
+            {/* Modal Footer */}
+            <div className="px-6 py-4 border-t border-gray-100 flex items-center justify-end gap-3 bg-slate-50/50">
+              <button
+                onClick={() => setShowEmailModal(false)}
+                disabled={isSendingEmail}
+                className="px-4 py-2 border border-gray-200 rounded-xl hover:bg-gray-50 text-sm font-semibold text-gray-600 disabled:opacity-55 cursor-pointer"
+              >
+                Cancel
+              </button>
+              <button
+                onClick={handleSendQuote}
+                disabled={isSendingEmail || !customerEmail.trim()}
+                className="px-5 py-2.5 bg-primary hover:bg-[#3d7ef7] text-white rounded-xl text-sm font-semibold shadow-md active:scale-95 transition-all flex items-center gap-1.5 disabled:opacity-55 disabled:cursor-not-allowed cursor-pointer"
+              >
+                {isSendingEmail ? (
+                  <>
+                    <Loader2 className="w-4 h-4 animate-spin" />
+                    Sending…
+                  </>
+                ) : (
+                  <>
+                    <Send className="w-4 h-4" />
+                    Send
+                  </>
+                )}
+              </button>
+            </div>
           </div>
         </div>
       )}
