@@ -974,9 +974,15 @@ ${proposalPricingText}
         throw new Error(`HTTP error! status: ${response.status}`);
       }
 
-      // 2. Send via secure Edge Function
+      // @ts-ignore
       const { data, error } = await supabase.functions.invoke('send-email', {
-        body: { toEmail: customerEmail.trim() }
+        body: { toEmail: customerEmail.trim() },
+        headers: {
+          // @ts-ignore
+          'apikey': supabase.supabaseKey || supabase.auth.session?.()?.access_token,
+          // @ts-ignore
+          'Authorization': `Bearer ${supabase.supabaseKey}`
+        }
       });
 
       if (error) {
