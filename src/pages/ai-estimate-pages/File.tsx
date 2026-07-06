@@ -39,6 +39,12 @@ import 'jspdf/dist/polyfills.es.js';
 // @ts-ignore
 import 'jspdf/dist/jspdf.es.min.js';
 import { useNavigate } from 'react-router-dom';
+import { createClient } from '@supabase/supabase-js';
+
+const supabase = createClient(
+  import.meta.env.VITE_SUPABASE_URL,
+  import.meta.env.VITE_SUPABASE_ANON_KEY
+);
 
 type XlsxLib = typeof import('xlsx-js-style');
 
@@ -968,22 +974,14 @@ ${proposalPricingText}
         throw new Error(`HTTP error! status: ${response.status}`);
       }
 
-      // 2. Generate PDF and send via secure Edge Function
-      const doc = generateProposalPDF();
-      const pdfBase64 = doc.output('datauristring').split(',')[1];
-      
-      const result = await aiTableData({
-        action: 'send-email',
-        estimate_page_id: selectedPage?.id,
-        email: customerEmail.trim(),
-        subject: `Construction Proposal & Budget Estimate - Project #${templateMetadata.projectId || 'Estimate'}`,
-        pdfBase64: pdfBase64,
-        projectId: templateMetadata.projectId || 'Estimate'
-      }).unwrap();
+      // 2. Send via secure Edge Function
+      const { data, error } = await supabase.functions.invoke('send-email', {
+        body: { toEmail: customerEmail.trim() }
+      });
 
-      if (result.error) {
-        console.error("[SENDGRID ERROR] Secure edge function response:", result.error);
-        throw new Error(result.error);
+      if (error) {
+        console.error("[SENDGRID ERROR] Secure edge function response:", error);
+        throw new Error(error.message || "Failed to send email");
       }
 
       toast.dismiss(loadingToast);
