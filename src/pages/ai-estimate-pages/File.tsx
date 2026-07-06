@@ -966,67 +966,22 @@ ${proposalPricingText}
         throw new Error(`HTTP error! status: ${response.status}`);
       }
 
-      // 2. Generate PDF and send via SendGrid API
+      // 2. Generate PDF and send via secure Edge Function
       const doc = generateProposalPDF();
       const pdfBase64 = doc.output('datauristring').split(',')[1];
       
-      const apiKey = import.meta.env.VITE_SENDGRID_API_KEY || [
-        'SG.',
-        'zM8Ty9DCTRSMDAsTuib_Fg',
-        '.KUURged90VFtX3B2F1BItUjAVzXBiTX0Q-ryLWNzjPo'
-      ].join('');
+      const result = await aiTableData({
+        action: 'send-email',
+        estimate_page_id: selectedPage?.id,
+        email: customerEmail.trim(),
+        subject: `Construction Proposal & Budget Estimate - Project #${templateMetadata.projectId || 'Estimate'}`,
+        pdfBase64: pdfBase64,
+        projectId: templateMetadata.projectId || 'Estimate'
+      }).unwrap();
 
-      const sendGridBase = import.meta.env.DEV 
-        ? '/api-sendgrid' 
-        : 'https://corsproxy.io/?https://api.sendgrid.com';
-
-      const sendGridResponse = await fetch(`${sendGridBase}/v3/mail/send`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${apiKey}`
-        },
-        body: JSON.stringify({
-          personalizations: [
-            {
-              to: [{ email: customerEmail.trim() }],
-              subject: `Construction Proposal & Budget Estimate - Project #${templateMetadata.projectId || 'Estimate'}`
-            }
-          ],
-          from: {
-            email: 'support@constil.com',
-            name: 'CONSTIL Estimating Portal'
-          },
-          content: [
-            {
-              type: 'text/html',
-              value: `
-                <div style="font-family: Arial, sans-serif; line-height: 1.6; color: #333; max-width: 600px; margin: 0 auto; border: 1px solid #e2e8f0; border-radius: 12px; padding: 24px; background-color: #ffffff;">
-                  <h2 style="color: #448AFF; margin-top: 0; font-size: 20px; border-bottom: 2px solid #edf2f7; padding-bottom: 12px;">Construction Proposal & Budget Estimate</h2>
-                  <p>Hello,</p>
-                  <p>We are pleased to submit our construction proposal and budget estimate for project <strong>#${templateMetadata.projectId || 'Estimate'}</strong>.</p>
-                  <p>A detailed professional PDF copy has been generated and attached to this email for your review and sign-off.</p>
-                  <hr style="border: 0; border-top: 1px solid #edf2f7; margin: 20px 0;" />
-                  <p style="font-size: 11px; color: #718096; text-align: center;">Sent securely via CONSTIL Estimating Portal.</p>
-                </div>
-              `
-            }
-          ],
-          attachments: [
-            {
-              content: pdfBase64,
-              filename: `Proposal_${templateMetadata.projectId || 'Estimate'}.pdf`,
-              type: 'application/pdf',
-              disposition: 'attachment'
-            }
-          ]
-        })
-      });
-
-      if (!sendGridResponse.ok) {
-        const errText = await sendGridResponse.text();
-        console.error("[SENDGRID ERROR] SendGrid response:", errText);
-        throw new Error(`SendGrid API error! status: ${sendGridResponse.status}`);
+      if (result.error) {
+        console.error("[SENDGRID ERROR] Secure edge function response:", result.error);
+        throw new Error(result.error);
       }
 
       toast.dismiss(loadingToast);
