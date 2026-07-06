@@ -868,7 +868,7 @@ const File = () => {
     }
 
     setIsSendingEmail(true);
-    const loadingToast = toast.info("Compiling PDF and sending via SendGrid...", { autoClose: false });
+    const loadingToast = toast.info("Sending PDF to email... Please wait.", { autoClose: false });
     try {
       let tablesJsonObj = selectedPage?.output_json;
       if (typeof tablesJsonObj === 'string') {
