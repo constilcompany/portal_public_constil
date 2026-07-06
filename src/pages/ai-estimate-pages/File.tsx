@@ -1488,7 +1488,7 @@ ${proposalPricingText}
                     disabled={isGeneratingProposal}
                     onClick={async () => {
                       setIsGeneratingProposal(true);
-                      const loadingToast = toast.info("Generating professional proposal layout from API...", { autoClose: false });
+                      const loadingToast = toast.info("Generating your proposal... Please wait.", { autoClose: false });
                       try {
                         const markdown = selectedPage?.output_markdown || '';
                         
