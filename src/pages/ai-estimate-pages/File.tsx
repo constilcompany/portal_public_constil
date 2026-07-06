@@ -852,7 +852,7 @@ const File = () => {
   const handleOpenPreview = () => {
     const doc = generateProposalPDF();
     const blobUrl = doc.output('bloburl');
-    setPreviewPdfUrl(blobUrl);
+    setPreviewPdfUrl(blobUrl.toString());
     setShowPreviewModal(true);
   };
 
