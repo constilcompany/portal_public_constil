@@ -578,12 +578,12 @@ const File = () => {
 
     // Helper: Draw header on content pages
     const drawContentHeader = () => {
-      doc.setFont("Helvetica", "bold");
-      doc.setFontSize(10);
+      doc.setFont("Times", "bold");
+      doc.setFontSize(12);
       doc.setTextColor(150, 150, 150);
       doc.text("CONSTIL Takeoff Proposal", margin, 15);
       
-      doc.setFontSize(10);
+      doc.setFontSize(12);
       const textVal = templateMetadata.projectId || 'Construction Proposal';
       doc.text(textVal, pageWidth - margin - doc.getTextWidth(textVal), 15);
       
@@ -598,8 +598,8 @@ const File = () => {
       doc.setLineWidth(0.5);
       doc.line(margin, pageHeight - 15, pageWidth - margin, pageHeight - 15);
       
-      doc.setFont("Helvetica", "normal");
-      doc.setFontSize(8);
+      doc.setFont("Times", "normal");
+      doc.setFontSize(12);
       doc.setTextColor(150, 150, 150);
       doc.text("Confidential & Proprietary", margin, pageHeight - 10);
       doc.text(`Page ${pageNum}`, pageWidth - margin - doc.getTextWidth(`Page ${pageNum}`), pageHeight - 10);
@@ -615,7 +615,7 @@ const File = () => {
       }
     } else {
       // Draw a default text logo
-      doc.setFont("Helvetica", "bold");
+      doc.setFont("Times", "bold");
       doc.setFontSize(18);
       doc.setTextColor(68, 138, 255); // #448AFF
       doc.text("CONSTIL", margin, 32);
@@ -624,7 +624,7 @@ const File = () => {
       doc.text("Takeoffs & Estimation", margin, 37);
     }
 
-    doc.setFont("Helvetica", "bold");
+    doc.setFont("Times", "bold");
     doc.setFontSize(28);
     doc.setTextColor(30, 41, 59); // Slate-800
     doc.text("CONSTRUCTION PROPOSAL", margin, 70);
@@ -634,12 +634,12 @@ const File = () => {
     doc.setLineWidth(2);
     doc.line(margin, 90, 80, 90);
 
-    doc.setFont("Helvetica", "normal");
+    doc.setFont("Times", "normal");
     doc.setFontSize(12);
     doc.setTextColor(100, 116, 139); // Slate-500
     const subtitleText = "Detailed material quantification, pricing breakdown, and execution scope details.";
     const splitSubtitle = doc.splitTextToSize(subtitleText, contentWidth);
-    doc.text(splitSubtitle, margin, 100);
+    doc.text(splitSubtitle, margin, 100, { lineHeightFactor: 1.5 });
 
     // Draw Metadata box
     const tableData = [
@@ -652,7 +652,7 @@ const File = () => {
       startY: 120,
       body: tableData,
       theme: 'plain',
-      styles: { fontSize: 9, cellPadding: 3, textColor: [71, 85, 105], font: 'Helvetica' },
+      styles: { fontSize: 12, cellPadding: 3, textColor: [71, 85, 105], font: 'Times' },
       columnStyles: {
         0: { fontStyle: 'bold', cellWidth: 25 },
         1: { cellWidth: 60 },
@@ -667,31 +667,31 @@ const File = () => {
     doc.addPage();
     drawContentHeader();
     
-    doc.setFont("Helvetica", "bold");
-    doc.setFontSize(14);
+    doc.setFont("Times", "bold");
+    doc.setFontSize(12);
     doc.setTextColor(30, 41, 59);
     doc.text("1. PROJECT SUMMARY", margin, 30);
     
-    doc.setFont("Helvetica", "normal");
-    doc.setFontSize(9);
+    doc.setFont("Times", "normal");
+    doc.setFontSize(12);
     doc.setTextColor(71, 85, 105);
     const splitSummary = doc.splitTextToSize(proposalSummary, contentWidth);
-    doc.text(splitSummary, margin, 36);
+    doc.text(splitSummary, margin, 36, { lineHeightFactor: 1.5 });
 
-    // Calculate Y for next section
-    const summaryHeight = splitSummary.length * 4;
+    // Calculate Y for next section (with 1.5 spacing, 12pt is ~6.35mm per line)
+    const summaryHeight = splitSummary.length * 6.35;
     let scopeY = 36 + summaryHeight + 15;
 
-    doc.setFont("Helvetica", "bold");
-    doc.setFontSize(14);
+    doc.setFont("Times", "bold");
+    doc.setFontSize(12);
     doc.setTextColor(30, 41, 59);
     doc.text("2. SCOPE OF WORK", margin, scopeY);
 
-    doc.setFont("Helvetica", "normal");
-    doc.setFontSize(9);
+    doc.setFont("Times", "normal");
+    doc.setFontSize(12);
     doc.setTextColor(71, 85, 105);
     const splitScope = doc.splitTextToSize(proposalScope, contentWidth);
-    doc.text(splitScope, margin, scopeY + 6);
+    doc.text(splitScope, margin, scopeY + 6, { lineHeightFactor: 1.5 });
 
     drawContentFooter(2);
 
@@ -699,43 +699,47 @@ const File = () => {
     doc.addPage();
     drawContentHeader();
 
-    doc.setFont("Helvetica", "bold");
-    doc.setFontSize(14);
+    doc.setFont("Times", "bold");
+    doc.setFontSize(12);
     doc.setTextColor(30, 41, 59);
     doc.text("3. PROJECT TIMELINE & MILESTONES", margin, 30);
 
-    doc.setFont("Helvetica", "bold");
-    doc.setFontSize(10);
+    doc.setFont("Times", "bold");
+    doc.setFontSize(12);
     doc.setTextColor(71, 85, 105);
     doc.text(`Target Duration: `, margin, 38);
-    doc.setFont("Helvetica", "normal");
+    doc.setFont("Times", "normal");
     doc.text(proposalTimelineDuration, margin + doc.getTextWidth("Target Duration: "), 38);
 
-    doc.setFont("Helvetica", "bold");
-    doc.text(`Estimated Start: `, margin, 44);
-    doc.setFont("Helvetica", "normal");
-    doc.text(proposalTimelineStart, margin + doc.getTextWidth("Estimated Start: "), 44);
+    doc.setFont("Times", "bold");
+    doc.text(`Estimated Start: `, margin, 45);
+    doc.setFont("Times", "normal");
+    doc.text(proposalTimelineStart, margin + doc.getTextWidth("Estimated Start: "), 45);
 
+    doc.setFont("Times", "normal");
+    doc.setFontSize(12);
     const splitTimeline = doc.splitTextToSize(proposalTimelineNotes, contentWidth);
-    doc.text(splitTimeline, margin, 52);
+    doc.text(splitTimeline, margin, 52, { lineHeightFactor: 1.5 });
 
-    const timelineHeight = splitTimeline.length * 4;
+    const timelineHeight = splitTimeline.length * 6.35;
     let warrantyY = 52 + timelineHeight + 15;
 
-    doc.setFont("Helvetica", "bold");
-    doc.setFontSize(14);
+    doc.setFont("Times", "bold");
+    doc.setFontSize(12);
     doc.setTextColor(30, 41, 59);
     doc.text("4. WARRANTY TERMS & CONDITIONS", margin, warrantyY);
 
-    doc.setFont("Helvetica", "bold");
-    doc.setFontSize(10);
+    doc.setFont("Times", "bold");
+    doc.setFontSize(12);
     doc.setTextColor(71, 85, 105);
     doc.text(`Warranty Period: `, margin, warrantyY + 8);
-    doc.setFont("Helvetica", "normal");
+    doc.setFont("Times", "normal");
     doc.text(proposalWarrantyPeriod, margin + doc.getTextWidth("Warranty Period: "), warrantyY + 8);
 
+    doc.setFont("Times", "normal");
+    doc.setFontSize(12);
     const splitWarranty = doc.splitTextToSize(proposalWarrantyTerms, contentWidth);
-    doc.text(splitWarranty, margin, warrantyY + 16);
+    doc.text(splitWarranty, margin, warrantyY + 16, { lineHeightFactor: 1.5 });
 
     drawContentFooter(3);
 
@@ -743,18 +747,18 @@ const File = () => {
     doc.addPage();
     drawContentHeader();
 
-    doc.setFont("Helvetica", "bold");
-    doc.setFontSize(14);
+    doc.setFont("Times", "bold");
+    doc.setFontSize(12);
     doc.setTextColor(30, 41, 59);
     doc.text("5. FINANCIAL BUDGET BREAKDOWN", margin, 30);
 
-    doc.setFont("Helvetica", "normal");
-    doc.setFontSize(9);
+    doc.setFont("Times", "normal");
+    doc.setFontSize(12);
     doc.setTextColor(71, 85, 105);
     const splitPricingText = doc.splitTextToSize(proposalPricingText, contentWidth);
-    doc.text(splitPricingText, margin, 36);
+    doc.text(splitPricingText, margin, 36, { lineHeightFactor: 1.5 });
 
-    const pricingTextHeight = splitPricingText.length * 4;
+    const pricingTextHeight = splitPricingText.length * 6.35;
     let pricingTableY = 36 + pricingTextHeight + 6;
 
     // Draw Budget summary grid
@@ -770,7 +774,7 @@ const File = () => {
       startY: pricingTableY,
       body: pricingRows,
       theme: 'grid',
-      styles: { fontSize: 9, cellPadding: 2.5, font: 'Helvetica' },
+      styles: { fontSize: 12, cellPadding: 2.5, font: 'Times' },
       columnStyles: {
         0: { cellWidth: 100 },
         1: { halign: 'right', cellWidth: 40 }
@@ -786,13 +790,13 @@ const File = () => {
     // @ts-ignore
     let sigY = doc.lastAutoTable.finalY + 15;
 
-    doc.setFont("Helvetica", "bold");
+    doc.setFont("Times", "bold");
     doc.setFontSize(12);
     doc.setTextColor(30, 41, 59);
     doc.text("6. CLIENT ACCEPTANCE SIGNATURE", margin, sigY);
     
-    doc.setFont("Helvetica", "normal");
-    doc.setFontSize(8);
+    doc.setFont("Times", "normal");
+    doc.setFontSize(12);
     doc.text("By signing below, both parties confirm authorization and acceptance of the takeoff requirements.", margin, sigY + 5);
 
     let blocksY = sigY + 10;
@@ -802,13 +806,12 @@ const File = () => {
     doc.setLineWidth(0.5);
     doc.line(margin, blocksY + 30, margin + 70, blocksY + 30);
     
-    doc.setFont("Helvetica", "bold");
-    doc.setFontSize(9);
+    doc.setFont("Times", "bold");
+    doc.setFontSize(12);
     doc.setTextColor(71, 85, 105);
     doc.text(proposalPreparedBy, margin, blocksY + 35);
-    doc.setFont("Helvetica", "normal");
-    doc.setFontSize(8);
-    doc.text("Contractor Representative", margin, blocksY + 39);
+    doc.setFont("Times", "normal");
+    doc.text("Contractor Representative", margin, blocksY + 41);
 
     if (contractorSignatureUrl) {
       try {
@@ -821,13 +824,12 @@ const File = () => {
     // Right Signature Block (Client)
     doc.line(pageWidth - margin - 70, blocksY + 30, pageWidth - margin, blocksY + 30);
     
-    doc.setFont("Helvetica", "bold");
-    doc.setFontSize(9);
+    doc.setFont("Times", "bold");
+    doc.setFontSize(12);
     doc.setTextColor(71, 85, 105);
     doc.text(proposalPreparedFor || "Authorized Client Signature", pageWidth - margin - 70, blocksY + 35);
-    doc.setFont("Helvetica", "normal");
-    doc.setFontSize(8);
-    doc.text(`Date of Signature: ${proposalSignatureDate || '__________________'}`, pageWidth - margin - 70, blocksY + 39);
+    doc.setFont("Times", "normal");
+    doc.text(`Date of Signature: ${proposalSignatureDate || '__________________'}`, pageWidth - margin - 70, blocksY + 41);
 
     if (clientSignatureUrl) {
       try {
