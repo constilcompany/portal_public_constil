@@ -23,6 +23,8 @@ import {
   X,
   Mic,
   MicOff,
+  Eye,
+  Mail,
 } from 'lucide-react';
 import {
   useAiTableDataMutation,
@@ -318,6 +320,8 @@ const File = () => {
 
   const [showFinalResultModal, setShowFinalResultModal] = useState(false);
   const [showEmailModal, setShowEmailModal] = useState(false);
+  const [showPreviewModal, setShowPreviewModal] = useState(false);
+  const [previewPdfUrl, setPreviewPdfUrl] = useState<string | null>(null);
   const [customerEmail, setCustomerEmail] = useState('');
   const [isSendingEmail, setIsSendingEmail] = useState(false);
   const [templateMetadata, setTemplateMetadata] = useState({
@@ -837,6 +841,21 @@ const File = () => {
     return doc;
   };
 
+  const handleOpenPreview = () => {
+    const doc = generateProposalPDF();
+    const blobUrl = doc.output('bloburl');
+    setPreviewPdfUrl(blobUrl);
+    setShowPreviewModal(true);
+  };
+
+  const handleClosePreview = () => {
+    if (previewPdfUrl) {
+      URL.revokeObjectURL(previewPdfUrl);
+    }
+    setPreviewPdfUrl(null);
+    setShowPreviewModal(false);
+  };
+
   const handleSendQuote = async () => {
     if (!customerEmail.trim()) {
       toast.error("Please enter a valid email address.");
@@ -1013,6 +1032,11 @@ ${proposalPricingText}
       toast.dismiss(loadingToast);
       toast.success("Proposal PDF emailed to customer successfully!");
       setShowEmailModal(false);
+      setShowPreviewModal(false);
+      if (previewPdfUrl) {
+        URL.revokeObjectURL(previewPdfUrl);
+        setPreviewPdfUrl(null);
+      }
       setShowFinalResultModal(false);
       setCustomerEmail('');
     } catch (err: any) {
@@ -2578,13 +2602,22 @@ ${proposalPricingText}
               >
                 Close
               </button>
-              <button
-                onClick={() => setShowEmailModal(true)}
-                className="px-5 py-2.5 bg-primary hover:bg-[#3d7ef7] text-white rounded-xl text-sm font-semibold shadow-md active:scale-95 transition-all flex items-center gap-1.5 cursor-pointer"
-              >
-                <Send className="w-4 h-4" />
-                Send to Customer
-              </button>
+              <div className="flex items-center gap-2">
+                <button
+                  onClick={handleOpenPreview}
+                  className="px-5 py-2.5 border border-slate-200 bg-white hover:bg-slate-50 text-slate-700 rounded-xl text-sm font-semibold shadow-sm active:scale-95 transition-all flex items-center gap-1.5 cursor-pointer"
+                >
+                  <Eye className="w-4 h-4 text-slate-500" />
+                  Preview PDF
+                </button>
+                <button
+                  onClick={() => setShowEmailModal(true)}
+                  className="px-5 py-2.5 bg-primary hover:bg-[#3d7ef7] text-white rounded-xl text-sm font-semibold shadow-md active:scale-95 transition-all flex items-center gap-1.5 cursor-pointer"
+                >
+                  <Send className="w-4 h-4" />
+                  Send to Customer
+                </button>
+              </div>
             </div>
           </div>
         </div>
@@ -2654,6 +2687,102 @@ ${proposalPricingText}
                   </>
                 )}
               </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {showPreviewModal && (
+        <div className="fixed inset-0 z-[70] flex items-center justify-center bg-slate-900/60 backdrop-blur-sm p-4 md:p-6 overflow-y-auto thin-scrollbar animate-in fade-in duration-200">
+          <div className="bg-slate-100 rounded-2xl shadow-2xl border border-slate-200/80 max-w-6xl w-full h-[90vh] flex flex-col md:flex-row overflow-hidden transform transition-all duration-300 scale-100 animate-in zoom-in-95 duration-200">
+            {/* Left Side: PDF Viewer */}
+            <div className="flex-1 bg-slate-200 relative min-h-[300px] md:min-h-0">
+              {previewPdfUrl ? (
+                <iframe
+                  src={previewPdfUrl}
+                  title="PDF Preview"
+                  className="w-full h-full border-none bg-slate-200"
+                />
+              ) : (
+                <div className="w-full h-full flex flex-col items-center justify-center text-slate-400 gap-2">
+                  <Loader2 className="w-8 h-8 animate-spin text-primary" />
+                  <span className="text-sm">Preparing PDF Preview...</span>
+                </div>
+              )}
+            </div>
+
+            {/* Right Side: Sending Panel */}
+            <div className="w-full md:w-96 bg-white p-6 md:p-8 flex flex-col justify-between shrink-0 border-t md:border-t-0 md:border-l border-slate-200/60">
+              <div className="space-y-6">
+                {/* Header */}
+                <div className="flex items-center justify-between">
+                  <div>
+                    <h3 className="text-lg font-bold text-slate-900 flex items-center gap-2">
+                      <Mail className="w-5 h-5 text-primary" />
+                      Send Proposal
+                    </h3>
+                    <p className="text-xs text-slate-500 mt-1">
+                      Review the generated professional PDF proposal on the left and specify your customer's email address below to deliver it securely.
+                    </p>
+                  </div>
+                  <button
+                    onClick={handleClosePreview}
+                    className="md:hidden p-1.5 rounded-full hover:bg-slate-100 text-slate-400 hover:text-slate-600 transition-colors"
+                  >
+                    <X className="w-5 h-5" />
+                  </button>
+                </div>
+
+                <hr className="border-slate-100" />
+
+                {/* Email Input */}
+                <div className="space-y-2">
+                  <label htmlFor="preview-customer-email" className="block text-xs font-bold text-slate-400 uppercase tracking-wider">
+                    Customer Email Address
+                  </label>
+                  <div className="relative">
+                    <input
+                      id="preview-customer-email"
+                      type="email"
+                      required
+                      value={customerEmail}
+                      onChange={(e) => setCustomerEmail(e.target.value)}
+                      placeholder="e.g. customer@example.com"
+                      disabled={isSendingEmail}
+                      className="w-full pl-10 pr-4 py-3 border border-slate-200 rounded-xl text-sm focus:border-primary focus:ring-2 focus:ring-primary/20 outline-none transition-all"
+                    />
+                    <Mail className="absolute left-3.5 top-[14px] w-4 h-4 text-slate-400" />
+                  </div>
+                </div>
+              </div>
+
+              {/* Buttons */}
+              <div className="mt-8 flex flex-col sm:flex-row md:flex-col gap-3">
+                <button
+                  onClick={handleSendQuote}
+                  disabled={isSendingEmail || !customerEmail.trim()}
+                  className="w-full order-1 sm:order-2 md:order-1 px-5 py-3 bg-primary hover:bg-[#3d7ef7] text-white rounded-xl text-sm font-semibold shadow-md active:scale-95 transition-all flex items-center justify-center gap-2 disabled:opacity-55 disabled:cursor-not-allowed cursor-pointer"
+                >
+                  {isSendingEmail ? (
+                    <>
+                      <Loader2 className="w-4 h-4 animate-spin" />
+                      Sending Proposal...
+                    </>
+                  ) : (
+                    <>
+                      <Send className="w-4 h-4" />
+                      Send Proposal
+                    </>
+                  )}
+                </button>
+                <button
+                  onClick={handleClosePreview}
+                  disabled={isSendingEmail}
+                  className="w-full order-2 sm:order-1 md:order-2 px-5 py-3 border border-slate-200 text-slate-600 rounded-xl text-sm font-semibold hover:bg-slate-50 active:scale-95 transition-all disabled:opacity-55 cursor-pointer text-center"
+                >
+                  Cancel &amp; Edit
+                </button>
+              </div>
             </div>
           </div>
         </div>
