@@ -16,6 +16,8 @@ export default defineConfig(({ mode }) => {
       include: ['xlsx-js-style'],
     },
     server: {
+      port: 5173,
+      strictPort: true,
       proxy: {
         '/api-fast': {
           target: fastApiTarget,

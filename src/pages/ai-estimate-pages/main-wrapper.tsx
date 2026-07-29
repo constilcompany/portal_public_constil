@@ -2,7 +2,7 @@
 import { useEffect, useState } from 'react';
 import { ChevronLeft } from 'lucide-react';
 import ProjectInfoStep from './ProjectInfoStep';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useLocation } from 'react-router-dom';
 import { toast } from 'react-toastify';
 import axios from 'axios';
 import { useDispatch, useSelector } from 'react-redux';
@@ -16,6 +16,7 @@ const sleep = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
 
 const CreateProjectWizard = () => {
   const navigate = useNavigate();
+  const location = useLocation();
   const dispatch = useDispatch();
   const token = useSelector((state: RootState) => state.auth.token);
 
@@ -25,12 +26,12 @@ const CreateProjectWizard = () => {
   const [jobStage, setJobStage] = useState<'idle' | 'uploading' | 'polling' | 'saving'>('idle');
 
   const [projectData, setProjectData] = useState({
-    projectName: '',
+    projectName: location.state?.projectName || '',
     projectAddress: '',
     client: '',
-    description: '',
+    description: location.state?.description || '',
     source: [],
-    files: [] as File[],
+    files: location.state?.files || ([] as File[]),
   });
 
   const handleSubmit = async () => {

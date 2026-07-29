@@ -16,6 +16,13 @@ const invoiceApi = createAPI.injectEndpoints({
       providesTags: ['Invoice'],
     }),
 
+    // ✅ Follow-ups
+    getEstimateFollowups: build.query<any, void>({
+      query: () => `/estimate_followups?select=*,estimates(estimate_number,total_amount,client_id,clients(name))&order=created_at.desc`,
+      transformResponse: (response: any[]) => ({ data: response }),
+      providesTags: ['Followup'],
+    }),
+
     // ✅ Clients
     getClients: build.query<any, void>({
       query: () => `/clients?select=*&order=created_at.desc`,
@@ -353,13 +360,16 @@ const invoiceApi = createAPI.injectEndpoints({
       invalidatesTags: ['Update-estimate'],
     }),
 
-    updateUserProfile: build.mutation<any, { id: string; body: any }>({
-      query: ({ id, body }) => ({
-        url: `/profiles?id=eq.${id}`,
-        method: 'PATCH',
-        body,
+    updateUserProfile: build.mutation<any, { body: any }>({
+      query: ({ body }) => ({
+        url: `/profiles?on_conflict=id`,
+        method: 'POST',
+        headers: {
+            'Prefer': 'resolution=merge-duplicates'
+        },
+        body
       }),
-      invalidatesTags: ['Invoice'],
+      invalidatesTags: ['Invoice', 'Company'],
     }),
 
     loginWithGoogle: build.mutation<any, { id_token: string }>({
@@ -513,23 +523,40 @@ const invoiceApi = createAPI.injectEndpoints({
     }),
     getCompany: build.query<any, void>({
       async queryFn(_arg, _queryApi, _extraOptions, baseQuery) {
-        // 1. Get User Profile (profiles_with_stats often has better user info)
-        const userResult = await baseQuery("/profiles?select=*");
-        if (userResult.error) return { error: userResult.error };
-        const profile = (userResult.data as any[])[0];
+        let userId = '';
+        const token = localStorage.getItem('access_token');
+        if (token) {
+          try {
+            const base64Url = token.split('.')[1];
+            const base64 = base64Url.replace(/-/g, '+').replace(/_/g, '/');
+            const jsonPayload = decodeURIComponent(atob(base64).split('').map(function(c) {
+                return '%' + ('00' + c.charCodeAt(0).toString(16)).slice(-2);
+            }).join(''));
+            userId = JSON.parse(jsonPayload).sub;
+          } catch (e) {
+             console.error(e);
+          }
+        }
 
-        // 2. Get Company Profile (Link by user_id which is the UUID)
-        const userId = profile.user_id || profile.id;
-        const companyResult = await baseQuery(`/company_profiles?user_id=eq.${userId}&select=*`);
+        const profileUrl = userId ? `/profiles?select=*&user_id=eq.${userId}` : `/profiles?select=*`;
+        const companyUrl = userId ? `/company_profiles?select=*&user_id=eq.${userId}` : `/company_profiles?select=*`;
+
+        // 1. Get User Profile
+        const userResult = await baseQuery(profileUrl);
+        if (userResult.error) return { error: userResult.error };
+        const profile = (userResult.data as any[])?.[0] || {};
+
+        // 2. Get Company Profile
+        const companyResult = await baseQuery(companyUrl);
         if (companyResult.error) return { error: companyResult.error };
-        const company = (companyResult.data as any[])[0];
+        const company = (companyResult.data as any[])?.[0] || {};
 
         return {
           data: {
             status: true,
             data: {
-              company_info: company || {},
-              user_info: profile || {}
+              company_info: company,
+              user_info: profile
             }
           }
         };
@@ -548,11 +575,30 @@ const invoiceApi = createAPI.injectEndpoints({
       invalidatesTags: ['Company'],
     }),
     getLegalInfo: build.query<any, void>({
-      query: () => `/company_profiles?select=*`,
-      providesTags: ['LegalInfo'],
-      transformResponse: (response: any[]) => {
-        return { data: response[0] || {} };
+      async queryFn(_arg, _queryApi, _extraOptions, baseQuery) {
+        let userId = '';
+        const token = localStorage.getItem('access_token');
+        if (token) {
+          try {
+            const base64Url = token.split('.')[1];
+            const base64 = base64Url.replace(/-/g, '+').replace(/_/g, '/');
+            const jsonPayload = decodeURIComponent(atob(base64).split('').map(function(c) {
+                return '%' + ('00' + c.charCodeAt(0).toString(16)).slice(-2);
+            }).join(''));
+            userId = JSON.parse(jsonPayload).sub;
+          } catch (e) {
+             console.error(e);
+          }
+        }
+
+        const companyUrl = userId ? `/company_profiles?select=*&user_id=eq.${userId}` : `/company_profiles?select=*`;
+        const companyResult = await baseQuery(companyUrl);
+        if (companyResult.error) return { error: companyResult.error };
+        const company = (companyResult.data as any[])?.[0] || {};
+        
+        return { data: { data: company } };
       },
+      providesTags: ['LegalInfo'],
     }),
     uploadLegalInfo: build.mutation<any, Partial<any>>({
       query: (body) => ({
@@ -599,6 +645,7 @@ export const {
   useGetDiscountsQuery,
   useCreateDiscountMutation,
   useGetTaxesQuery,
+  useGetEstimateFollowupsQuery,
   useGetEstimatesQuery,
   useCreateEstimateMutation,
   useGetInvoiceSingleQuery,

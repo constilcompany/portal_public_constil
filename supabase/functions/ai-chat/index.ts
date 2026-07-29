@@ -34,16 +34,22 @@ Deno.serve(async (req) => {
 
     const body = await req.json()
     const { action, estimate_page_id } = body
-    if (!estimate_page_id) return json({ error: 'estimate_page_id is required' }, 200)
+    
+    // Only fetch page data for chat-related actions
+    let pageData = null;
+    if (['chat', 'apply', 'history'].includes(action)) {
+      if (!estimate_page_id) return json({ error: 'estimate_page_id is required for this action' }, 200)
 
-    // Get current estimate data
-    const { data: pageData, error: pageError } = await supabase
-      .from('ai_estimate_results')
-      .select('*, ai_estimates(*)')
-      .eq('id', estimate_page_id)
-      .single()
+      // Get current estimate data
+      const { data, error: pageError } = await supabase
+        .from('ai_estimate_results')
+        .select('*, ai_estimates(*)')
+        .eq('id', estimate_page_id)
+        .single()
 
-    if (pageError || !pageData) return json({ error: 'Estimate page not found' }, 200)
+      if (pageError || !data) return json({ error: 'Estimate page not found' }, 200)
+      pageData = data;
+    }
 
     // --- Helper: Call Fireworks (matches your Construction_agent.py setup) ---
     const callAI = async (systemPrompt: string, userPrompt: string, model = "accounts/fireworks/models/gpt-oss-120b") => {
@@ -200,6 +206,16 @@ Deno.serve(async (req) => {
       return json({ status: true, data })
     }
 
+    // --- Action: SUMMARIZE-EMAIL ---
+    if (action === 'summarize-email') {
+      const { emailBody, attachmentsInfo } = body;
+      const systemPrompt = `You are a concise email summarizer. Summarize the following email clearly and briefly in 2-4 sentences. If there are attachments listed in 'Attachments Info', explicitly mention what they are at the end of your summary. Do not output anything other than the summary.`;
+      const userPrompt = `Email Content:\n${emailBody}\n\nAttachments Info: ${attachmentsInfo || 'None'}`;
+      
+      const summary = await callAI(systemPrompt, userPrompt);
+      return json({ status: true, summary });
+    }
+
     // --- Action: SEND-EMAIL ---
     if (action === 'send-email') {
       const { email, subject, pdfBase64, projectId } = body
@@ -263,6 +279,220 @@ Deno.serve(async (req) => {
       }
 
       return json({ status: true, message: 'Email sent successfully via SendGrid' })
+    }
+
+    // --- Action: NYLAS-EXCHANGE-CODE ---
+    if (action === 'nylas-exchange-code') {
+      const { code, clientId, redirectUri } = body
+      if (!code || !clientId || !redirectUri) return json({ error: 'Missing required parameters for Nylas Auth' }, 200)
+
+      const nylasApiKey = Deno.env.get('NYLAS_API_KEY')
+      if (!nylasApiKey) return json({ error: 'NYLAS_API_KEY secret is not set.' }, 200)
+
+      const response = await fetch('https://api.us.nylas.com/v3/connect/token', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          client_id: clientId,
+          client_secret: nylasApiKey,
+          grant_type: 'authorization_code',
+          code,
+          redirect_uri: redirectUri
+        })
+      })
+
+      if (!response.ok) {
+        const errText = await response.text()
+        console.error("[NYLAS ERROR] Token Exchange:", errText)
+        return json({ error: `Nylas API error: ${response.status} - ${errText}` }, 200)
+      }
+
+      const data = await response.json()
+      return json({ status: true, grant_id: data.grant_id })
+    }
+
+    // --- Action: NYLAS-SEND-EMAIL ---
+    if (action === 'nylas-send-email') {
+      const { grantId, toEmail, subject, bodyText, pdfBase64, fileName, attachments } = body
+      if (!grantId || !toEmail) return json({ error: 'Missing required parameters for sending email' }, 200)
+
+      const nylasApiKey = Deno.env.get('NYLAS_API_KEY')
+      if (!nylasApiKey) return json({ error: 'NYLAS_API_KEY secret is not set.' }, 200)
+
+      let finalAttachments = attachments || []
+      if (pdfBase64 && fileName) {
+        finalAttachments.push({
+          filename: fileName,
+          content: pdfBase64,
+          content_type: 'application/pdf'
+        })
+      }
+
+      const response = await fetch(`https://api.us.nylas.com/v3/grants/${grantId}/messages/send`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${nylasApiKey}`
+        },
+        body: JSON.stringify({
+          subject: subject || 'Construction Proposal & Estimate',
+          body: bodyText || 'Please find your estimate attached.',
+          to: [{ email: toEmail.trim() }],
+          attachments: finalAttachments.length > 0 ? finalAttachments : undefined
+        })
+      })
+
+      if (!response.ok) {
+        const errText = await response.text()
+        console.error("[NYLAS ERROR] Send Email:", errText)
+        return json({ error: `Nylas API error: ${response.status} - ${errText}` }, 200)
+      }
+
+      const data = await response.json()
+      return json({ status: true, message: 'Email sent successfully via Nylas', data })
+    }
+
+    // --- Action: NYLAS-GET-EMAILS ---
+    if (action === 'nylas-get-emails') {
+      const { grantId, folder = 'INBOX', limit = 20 } = body
+      if (!grantId) return json({ error: 'Missing required parameters for getting emails' }, 200)
+
+      const nylasApiKey = Deno.env.get('NYLAS_API_KEY')
+      if (!nylasApiKey) return json({ error: 'NYLAS_API_KEY secret is not set.' }, 200)
+
+      const url = new URL(`https://api.us.nylas.com/v3/grants/${grantId}/messages`)
+      url.searchParams.append('limit', limit.toString())
+      if (folder) {
+        url.searchParams.append('in', folder)
+      }
+
+      const response = await fetch(url.toString(), {
+        method: 'GET',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${nylasApiKey}`
+        }
+      })
+
+      if (!response.ok) {
+        const errText = await response.text()
+        console.error("[NYLAS ERROR] Get Emails:", errText)
+        return json({ error: `Nylas API error: ${response.status} - ${errText}` }, 200)
+      }
+
+      const data = await response.json()
+      
+      const CRITICAL_CONSTRUCTION_KEYWORDS = [
+        'quote', 'quotation', 'estimate', 'estimated cost', 'cost estimate', 'pricing', 'price', 'price request', 'pricing request', 'cost', 'budget', 'proposal', 'request for proposal', 'rfp', 'rfq', 'request for quotation', 'request for quote', 'bid', 'bidding', 'tender', 'invitation to bid', 'itb', 'scope of work', 'sow', 'work request', 'project inquiry', 'new project', 'project request', 'cost breakdown', 'pricing sheet', 'competitive quote',
+        'invoice', 'tax invoice', 'proforma invoice', 'bill', 'billing', 'payment', 'payment request', 'payment due', 'past due', 'balance due', 'statement', 'receipt', 'paid', 'payment confirmation', 'deposit', 'advance payment', 'final payment', 'progress payment', 'milestone payment', 'remittance', 'remittance advice', 'wire transfer', 'ach', 'bank transfer', 'purchase', 'purchase order', 'po', 'po number', 'credit memo', 'debit memo',
+        'construction', 'renovation', 'remodel', 'remodelling', 'remodeling', 'extension', 'addition', 'new build', 'custom home', 'commercial project', 'residential project', 'tenant improvement', 'fit out', 'fit-out', 'civil works', 'site work', 'excavation', 'foundation', 'roofing', 'framing', 'drywall', 'flooring', 'painting', 'electrical', 'plumbing', 'hvac', 'concrete', 'masonry', 'landscaping', 'demolition', 'structural', 'engineering', 'architect', 'architectural', 'blueprint', 'drawing', 'plans', 'permit', 'inspection', 'building permit', 'site visit', 'walkthrough', 'consultation',
+        'schedule', 'site visit', 'inspection', 'meeting', 'appointment', 'availability', 'start date', 'completion date', 'timeline', 'eta', 'kickoff', 'mobilization', 'project start', 'construction schedule', 'site meeting', 'progress meeting', 'follow up', 'follow-up',
+        'looking for', 'need a contractor', 'need estimate', 'need quote', 'interested', 'interested in', 'can you quote', 'can you estimate', 'please quote', 'please estimate', 'price this', 'pricing for', 'cost for', 'looking to build', 'looking to renovate', 'project details', 'job request', 'service request', 'work required', 'need pricing',
+        'material order', 'supplier', 'vendor', 'subcontractor', 'procurement', 'equipment', 'materials', 'delivery', 'shipment', 'backorder', 'inventory', 'stock',
+        'contract', 'agreement', 'signed', 'signature', 'execute', 'terms', 'conditions', 'change order', 'variation', 'work order', 'service agreement', 'contractor agreement',
+        'drawing', 'blueprint', 'cad', 'autocad', 'pdf plans', 'site plan', 'elevation', 'floor plan', 'permit', 'engineering drawings', 'architectural drawings', 'structural drawings', 'specifications', 'specs', 'boq', 'bill of quantities', 'takeoff', 'material list',
+        'budget', 'financing', 'loan', 'cost analysis', 'cash flow', 'expense', 'expense report', 'pricing approval', 'budget approval', 'approval', 'approved',
+        'progress', 'update', 'project update', 'status update', 'inspection passed', 'inspection failed', 'completed', 'completion', 'substantial completion', 'handover', 'punch list', 'snag list', 'delay', 'change request', 'variation request',
+        'estimate.pdf', 'quote.pdf', 'quotation.pdf', 'proposal.pdf', 'invoice.pdf', 'drawing.pdf', 'blueprint.pdf', 'plans.pdf', 'contract.pdf', 'agreement.pdf', 'boq.xlsx', 'takeoff.xlsx', 'pricing.xlsx', 'scope.pdf',
+        'can you provide a quote', 'can you send a quote', 'need an estimate', 'need pricing', 'can you bid', 'request for quotation', 'request for estimate', 'please review attached plans', 'please quote', 'need contractor', 'looking for contractor', 'please provide proposal', 'can you price this project', 'can you estimate this project', 'need cost breakdown',
+        'general contractor', 'gc', 'subcontractor', 'roofing', 'electrical', 'plumbing', 'hvac', 'painting', 'drywall', 'flooring', 'cabinet', 'concrete', 'foundation', 'excavation', 'framing', 'steel', 'landscaping', 'tiling', 'insulation', 'windows', 'doors', 'solar', 'fencing', 'paving', 'asphalt', 'masonry'
+      ];
+
+      const escapeRegExp = (string: string) => {
+        return string.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+      };
+
+      const filteredMessages = (data.data || []).filter((msg: any) => {
+        const subject = (msg.subject || '').toLowerCase();
+        const rawBody = msg.body || msg.snippet || '';
+        
+        // 1. Strip HTML tags from the body so we don't accidentally match attributes like class="quote"
+        const noHtmlBody = rawBody.replace(/<[^>]*>?/gm, ' ');
+
+        // 2. Truncate email reply history (extract only the latest active message)
+        const splitRegex = /_|<hr>|---Original Message---|From:|On\s+.*?\s+wrote:/i;
+        const activeBody = noHtmlBody.split(splitRegex)[0].toLowerCase();
+        
+        // 2. Strict whole-word boundary matching
+        return CRITICAL_CONSTRUCTION_KEYWORDS.some(kw => {
+          const regex = new RegExp(`\\b${escapeRegExp(kw)}\\b`, 'i');
+          return regex.test(subject) || regex.test(activeBody);
+        });
+      });
+
+      return json({ status: true, messages: filteredMessages })
+    }
+
+    // --- Action: NYLAS-REPLY-EMAIL ---
+    if (action === 'nylas-reply-email') {
+      const { grantId, messageId, toEmail, subject, bodyText, attachments } = body
+      if (!grantId || !messageId || !toEmail || !bodyText) return json({ error: 'Missing required parameters for replying' }, 200)
+
+      const nylasApiKey = Deno.env.get('NYLAS_API_KEY')
+      if (!nylasApiKey) return json({ error: 'NYLAS_API_KEY secret is not set.' }, 200)
+
+      const payload: any = {
+        subject: subject || 'Re:',
+        body: bodyText,
+        to: [{ email: toEmail.trim() }],
+        reply_to_message_id: messageId
+      }
+      if (attachments && attachments.length > 0) {
+        payload.attachments = attachments;
+      }
+
+      const response = await fetch(`https://api.us.nylas.com/v3/grants/${grantId}/messages/send`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${nylasApiKey}`
+        },
+        body: JSON.stringify(payload)
+      })
+
+      if (!response.ok) {
+        const errText = await response.text()
+        console.error("[NYLAS ERROR] Reply Email:", errText)
+        return json({ error: `Nylas API error: ${response.status} - ${errText}` }, 200)
+      }
+
+      const data = await response.json()
+      return json({ status: true, message: 'Reply sent successfully via Nylas', data })
+    }
+
+    // --- Action: NYLAS-DOWNLOAD-ATTACHMENT ---
+    if (action === 'nylas-download-attachment') {
+      const { grantId, attachmentId, messageId } = body
+      if (!grantId || !attachmentId) return json({ error: 'Missing required parameters for downloading attachment' }, 200)
+
+      const nylasApiKey = Deno.env.get('NYLAS_API_KEY')
+      if (!nylasApiKey) return json({ error: 'NYLAS_API_KEY secret is not set.' }, 200)
+
+      let url = `https://api.us.nylas.com/v3/grants/${grantId}/attachments/${attachmentId}/download`
+      if (messageId) url += `?message_id=${messageId}`
+
+      const response = await fetch(url, {
+        method: 'GET',
+        headers: {
+          'Authorization': `Bearer ${nylasApiKey}`
+        }
+      })
+
+      if (!response.ok) {
+        const errText = await response.text()
+        console.error("[NYLAS ERROR] Download Attachment:", errText)
+        return json({ error: `Nylas API error: ${response.status} - ${errText}` }, 200)
+      }
+
+      const arrayBuffer = await response.arrayBuffer()
+      const uint8Array = new Uint8Array(arrayBuffer)
+      const chunks = []
+      for (let i = 0; i < uint8Array.length; i += 8192) {
+        chunks.push(String.fromCharCode.apply(null, Array.from(uint8Array.subarray(i, i + 8192))))
+      }
+      const base64Data = btoa(chunks.join(''))
+
+      return json({ status: true, data: base64Data, contentType: response.headers.get('content-type') })
     }
 
     return json({ error: 'Invalid action' }, 200)

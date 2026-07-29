@@ -76,18 +76,46 @@ const EditCompanyInfoModal = ({ open, onClose, data, onSuccess }: EditCompanyInf
         finalLogo = await S3UploadService.uploadFileInChunks(form.logo, undefined, 'document-logos');
       }
 
-      const targetUserId = u.user_id || u.id;
-      if (targetUserId) {
-        await updateUserProfile({
-          id: targetUserId,
-          body: {
+      let profileId = u.id; // integer primary key
+      let profileUserId = u.user_id; // UUID foreign key
+
+      const profileToken = localStorage.getItem('access_token');
+      if (profileToken) {
+        try {
+          const base64Url = profileToken.split('.')[1];
+          const base64 = base64Url.replace(/-/g, '+').replace(/_/g, '/');
+          const jsonPayload = decodeURIComponent(atob(base64).split('').map(function(c) {
+              return '%' + ('00' + c.charCodeAt(0).toString(16)).slice(-2);
+          }).join(''));
+          const decoded: any = JSON.parse(jsonPayload);
+          if (!profileUserId) profileUserId = decoded.sub;
+        } catch (e) {
+          console.error("Failed to decode JWT to get user_id", e);
+        }
+      }
+
+      if (profileId || profileUserId) {
+        try {
+          const profilePayload: any = {
             first_name: form.first_name,
             last_name: form.last_name,
-          },
-        }).unwrap();
+            full_name: `${form.first_name} ${form.last_name}`.trim(),
+            user_id: profileUserId,
+          };
+          if (profileId) profilePayload.id = profileId;
+
+          await updateUserProfile({
+            body: profilePayload,
+          }).unwrap();
+        } catch (profileErr: any) {
+          console.warn("Could not update profile (first/last name) - continuing with company update.", profileErr);
+          const errMsg = profileErr?.data?.message || profileErr?.data?.details || profileErr?.message || JSON.stringify(profileErr);
+          toast.error("Warning: Could not save personal name due to backend error: " + errMsg);
+        }
       }
 
       const companyPayload: any = {
+        ...c,
         company_legal_name: form.company_legal_name,
         address: form.address,
         company_email: form.company_email,
@@ -97,17 +125,41 @@ const EditCompanyInfoModal = ({ open, onClose, data, onSuccess }: EditCompanyInf
         logo_url: finalLogo,
       };
 
-      if (user?.id) {
-        companyPayload.user_id = user.id;
+      const companyToken = localStorage.getItem('access_token');
+      if (companyToken) {
+        try {
+          const decoded: any = JSON.parse(atob(companyToken.split('.')[1]));
+          companyPayload.user_id = decoded.sub;
+          if (!companyPayload.company_email) {
+            companyPayload.company_email = decoded.email || "";
+          }
+        } catch (e) {
+          console.error("Token decode error", e);
+        }
       }
+
+      if (!companyPayload.user_id) {
+        const companyUserId = u.user_id || u.id || user?.id;
+        if (companyUserId) {
+          companyPayload.user_id = companyUserId;
+        }
+      }
+      
+      if (!companyPayload.company_phone) {
+         companyPayload.company_phone = "";
+      }
+      
+      delete companyPayload.id;
+      delete companyPayload.created_at;
 
       await uploadCompany(companyPayload).unwrap();
       toast.success('Information updated successfully');
       onSuccess();
       onClose();
     } catch (err: any) {
-      toast.error(err?.data?.message || 'Failed to update information');
-      console.error(err);
+      const errMsg = err?.data?.message || err?.data?.details || err?.message || JSON.stringify(err);
+      toast.error('Error: ' + errMsg);
+      console.error("Update error:", err);
     }
   };
 
