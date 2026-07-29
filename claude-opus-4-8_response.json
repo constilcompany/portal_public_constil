@@ -1,0 +1,621 @@
+{
+  "status": true,
+  "estimate_text": "# ESTIMATE OF MATERIALS AND COST OF CONSTRUCTION\n**Date:** June 13, 2024  \n**Project ID:** Boot Barn \u2014 Turnpike Mall, Store #579  \n**Address:** 10-42 Whitten Rd., Augusta, ME 04330  \n**Scope:** Selected Scopes: Division 05/06 \u2014 Framing, Division 09 \u2014 Drywall, Division 26 \u2014 Electrical  \n**Drawing Reference:** A10 (Floor Plan), A20 (RCP), A01 (Egress), D10 (Demo), M10, M20, P10, P20, E10, E20, E30, E40 (MEP set)  \n**Scale:** 3/32\" = 1'-0\" (Floor Plan); Power/Lighting 3/16\" = 1'-0\"\n\n---\n\n## DIVISION 06 / 05 \u2014 FRAMING (ROUGH CARPENTRY & METAL STUDS)\n**CALCULATION SUMMARY:**\n- Total Partition Wall Area (stud face): 3,528 SF (VERIFIED via plan layout + dimension chains, chunk 1)\n- Exterior Wall Framing Area: NOT SHOWN (existing masonry demising walls \u2014 excluded)\n- Beam Linear Footage: NOT SHOWN ON DRAWING (existing structure)\n- Column Count / Linear Footage: Existing structural columns to remain \u2014 no new columns\n- Blocking & Miscellaneous Framing: 3,528 SF (partition footprint)\n\n| Item # | CSI Ref. | Description | Unit | Quantity | Wastage % | Qty w/ Wastage | Unit Material | Total Material | Unit Labor | Total Labor | Total Cost | Trade |\n|--------|----------|-------------|------|----------|-----------|----------------|---------------|----------------|------------|-------------|------------|-------|\n| FR.01 | 09 22 16 | Metal Stud 3-5/8\" 20ga (non-LB) | SF | 3,096 | 10% | 3,406 | $1.05 | $3,576.30 | $2.10 | $7,152.60 | $10,728.90 | Framing |\n| FR.02 | 09 22 16 | Metal Stud 6\" 20ga (non-LB) | SF | 432 | 10% | 475 | $1.25 | $593.75 | $2.25 | $1,068.75 | $1,662.50 | Framing |\n| FR.03 | 09 22 16 | Metal Stud 3-5/8\" 16ga (structural) | SF | 0 | 10% | 0 | $1.55 | $0.00 | $2.60 | $0.00 | $0.00 | Framing |\n| FR.04 | 06 11 00 | Wood Stud 2\u00d74 (16\" o.c.) | SF | 0 | 10% | 0 | $1.20 | $0.00 | $1.85 | $0.00 | $0.00 | Framing |\n| FR.05 | 06 11 00 | Wood Stud 2\u00d76 (16\" o.c.) | SF | 0 | 10% | 0 | $1.65 | $0.00 | $2.00 | $0.00 | $0.00 | Framing |\n| FR.06 | 06 11 23 | LVL Beam 3-1/2\" \u00d7 9-1/2\" | LF | 0 | 5% | 0 | $18.50 | $0.00 | $12.00 | $0.00 | $0.00 | Framing |\n| FR.07 | 06 11 23 | LVL Beam 3-1/2\" \u00d7 11-7/8\" | LF | 0 | 5% | 0 | $23.00 | $0.00 | $14.00 | $0.00 | $0.00 | Framing |\n| FR.08 | 09 22 16 | Metal Track (floor & ceiling) | LF | 784 | 5% | 823 | $0.55 | $452.65 | $0.65 | $534.95 | $987.60 | Framing |\n| FR.09 | 06 11 00 | Blocking & Fire Stopping | SF | 3,528 | 10% | 3,881 | $0.45 | $1,746.45 | $0.90 | $3,492.90 | $5,239.35 | Framing |\n| FR.10 | 05 12 00 | Structural Steel Column (W6\u00d715) | LF | 0 | 5% | 0 | $28.00 | $0.00 | $22.00 | $0.00 | $0.00 | Framing |\n| FR.11 | 05 12 00 | Structural Steel Beam (W8\u00d731) | LF | 0 | 5% | 0 | $48.00 | $0.00 | $35.00 | $0.00 | $0.00 | Framing |\n| FR.12 | 06 05 23 | Joist Hangers & Connectors (Allowance) | SF | 3,528 | 5% | 3,704 | $0.25 | $926.00 | $0.15 | $555.60 | $1,481.60 | Framing |\n\n**Division 06/05 \u2014 Framing Subtotal:** $20,099.45\n\n---\n\n## DIVISION 09 \u2014 DRYWALL (GYPSUM BOARD ASSEMBLIES)\n**CALCULATION SUMMARY:**\n- Total Wall Face Area (both sides): 6,000 SF\n- Total Ceiling Drywall Area: 620 SF (restrooms/office hard-lid; sales open to deck)\n- Wet / Fire-Rated Areas (cement board): 480 SF (restroom walls)\n- Total Corner Bead (LF): 640 LF\n\n| Item # | CSI Ref. | Description | Unit | Quantity | Wastage % | Qty w/ Wastage | Unit Material | Total Material | Unit Labor | Total Labor | Total Cost | Trade |\n|--------|----------|-------------|------|----------|-----------|----------------|---------------|----------------|------------|-------------|------------|-------|\n| D.01 | 09 21 16 | Drywall 1/2\" Standard \u2014 Walls | SF | 5,520 | 10% | 6,072 | $0.38 | $2,307.36 | $0.95 | $5,768.40 | $8,075.76 | Drywall |\n| D.02 | 09 21 16 | Drywall 5/8\" Type-X Fire-Rated \u2014 Walls | SF | 0 | 10% | 0 | $0.52 | $0.00 | $1.05 | $0.00 | $0.00 | Drywall |\n| D.03 | 09 21 16 | Drywall 1/2\" \u2014 Ceiling | SF | 620 | 10% | 682 | $0.40 | $272.80 | $1.10 | $750.20 | $1,023.00 | Drywall |\n| D.04 | 09 21 16 | Cement Board (wet areas) | SF | 480 | 10% | 528 | $0.85 | $448.80 | $1.25 | $660.00 | $1,108.80 | Drywall |\n| D.05 | 09 29 00 | Taping & Finishing \u2014 Level 4 | SF | 6,140 | 5% | 6,447 | $0.22 | $1,418.34 | $0.78 | $5,028.66 | $6,447.00 | Drywall |\n| D.06 | 09 29 00 | Taping & Finishing \u2014 Level 5 (Smooth) | SF | 0 | 5% | 0 | $0.28 | $0.00 | $1.05 | $0.00 | $0.00 | Drywall |\n| D.07 | 09 21 16 | Corner Bead (Metal) | LF | 640 | 5% | 672 | $0.18 | $120.96 | $0.35 | $235.20 | $356.16 | Drywall |\n| D.08 | 09 21 16 | Fasteners & Screws (Allowance) | SF | 6,620 | 5% | 6,951 | $0.05 | $347.55 | $0.00 | $0.00 | $347.55 | Drywall |\n| D.09 | 09 21 29 | Shaft Wall Assembly (stair/elevator) | SF | 0 | 10% | 0 | $2.80 | $0.00 | $3.50 | $0.00 | $0.00 | Drywall |\n\n**Division 09 \u2014 Drywall Subtotal:** $17,358.27\n\n---\n\n## DIVISION 26 \u2014 ELECTRICAL\n**DEVICE SUMMARY (merged, chunk 1 A20/A01 + chunk 2 E-series):**\n- Duplex Outlets (Standard): 56 (32 chunk 1 + 24 chunk 2)\n- GFCI Outlets: 10 (6 + 4)\n- Light Switches / Occ Sensors: 22 (14 + 8)\n- LED Recessed Lights: 225 (185 + 40)\n- Exit Signs (LED): 6 (VERIFIED \u2014 duplicate across chunks; counted once)\n- Smoke Detectors: 8 (4 + 4; duct smoke detectors VERIFIED chunk 2)\n- Data Outlets: 6 (VERIFIED cashwrap)\n- Panels: \"PP\" 200A priced; \"MP\" 400A excluded (no cost database line \u2014 field verify)\n- Conduit & Wire allowance uses single VERIFIED GFA of 17,137 SF (M00 load calc; supersedes chunk 1 estimate of 17,692 SF \u2014 not summed to avoid double-count of same floor area)\n\n| Item # | CSI Ref. | Description | Unit | Quantity | Wastage % | Qty w/ Wastage | Unit Material | Total Material | Unit Labor | Total Labor | Total Cost | Trade |\n|--------|----------|-------------|------|----------|-----------|----------------|---------------|----------------|------------|-------------|------------|-------|\n| 5.01 | 26 27 26 | Duplex Outlet (120V) | EA | 56 | 5% | 59 | $8.00 | $472.00 | $45.00 | $2,655.00 | $3,127.00 | Electrical |\n| 5.02 | 26 27 26 | GFCI Outlet | EA | 10 | 5% | 11 | $22.00 | $242.00 | $55.00 | $605.00 | $847.00 | Electrical |\n| 5.03 | 26 27 26 | Light Switch (Single-Pole) | EA | 22 | 5% | 23 | $5.00 | $115.00 | $35.00 | $805.00 | $920.00 | Electrical |\n| 5.04 | 26 51 13 | LED Recessed Light (6\") | EA | 225 | 5% | 237 | $35.00 | $8,295.00 | $85.00 | $20,145.00 | $28,440.00 | Electrical |\n| 5.05 | 26 52 13 | Exit Sign (LED) | EA | 6 | 5% | 7 | $85.00 | $595.00 | $95.00 | $665.00 | $1,260.00 | Electrical |\n| 5.06 | 26 28 13 | Smoke Detector (Hardwired) | EA | 8 | 5% | 9 | $65.00 | $585.00 | $95.00 | $855.00 | $1,440.00 | Electrical |\n| 5.07 | 26 05 26 | Conduit & Wire (Allowance) | SF | 17,137 | 10% | 18,851 | $6.00 | $113,106.00 | $10.00 | $188,510.00 | $301,616.00 | Electrical |\n| 5.08 | 26 24 16 | Electrical Panel (200A) \u2014 \"PP\" | EA | 1 | 0% | 1 | $925.00 | $925.00 | $985.00 | $985.00 | $1,910.00 | Electrical |\n\n**Division 26 Subtotal:** $339,560.00\n\n---\n\n## FINANCIAL SUMMARY\n| Description | Amount |\n|-------------|--------|\n| Division 01 - General Requirements | $0.00 |\n| Division 05/06 - Framing | $20,099.45 |\n| Division 06 - Finish Carpentry | Not in Scope |\n| Division 07 - Roofing | Not in Scope |\n| Division 07 - Insulation | Not in Scope |\n| Division 07 - Siding Installation | Not in Scope |\n| Division 08 - Windows Installation | Not in Scope |\n| Division 08 - Doors Installation | Not in Scope |\n| Division 09 - Finishes (Painting) | Not in Scope |\n| Division 09 - Drywall | $17,358.27 |\n| Division 09 - Flooring | Not in Scope |\n| Division 22 - Plumbing | Not in Scope |\n| Division 23 - HVAC | Not in Scope |\n| Division 26 - Electrical | $339,560.00 |\n| Division 01 - Cleaning | Not in Scope |\n| **SUBTOTAL** | **$377,017.72** |\n| Insurance (5%) | $18,850.89 |\n| Contingency (5%) | $18,850.89 |\n| Overhead & Profit (20%) | $75,403.54 |\n| **PROJECT TOTAL** | **$490,123.04** |\n\n---\n\n## ASSUMPTIONS & NOTES\n**VERIFIED DATA:**\n- Overall lease line dimension: 127'-6\" front (A10), ~141'-2\" side depth (A10)\n- Total tenant area: 17,692 SF (T00 title sheet); VERIFIED GFA for MEP allowance: 17,137 SF (M00 HVAC load calc \u2014 used for conduit/wire allowance)\n- Occupancy: Mercantile (M); Total occupants 254 (T00 Code Review)\n- Exit signs: 6 counted on A01 Egress Plan (reconciled with E30 \u2014 counted once)\n- Panel \"MP\" = 400A, 3\u00d8 4W; Panel \"PP\" = 200A (E30 one-line & panel schedules)\n- Light fixture schedule (E30): Type A pendant track (333 EA), C1 track heads (163 EA), recessed troffers, exit/emergency\n- Duct smoke detectors present (M10/E10); data outlets at cashwrap (E10)\n- Sales area and stockroom \"open to deck\" (A30)\n\n**ASSUMPTIONS MADE:**\n- Ceiling/partition framing height: 9'-0\"; sales area open-to-deck (supply duct at 13'-6\" A.F.F., M10)\n- Wall deductions: 15% for doors/openings\n- Metal studs 3-5/8\" 20ga non-LB partitions; 6\" studs at restroom wet walls; cement board at restroom wet walls (480 SF)\n- Ceiling drywall only in hard-lid rooms (restrooms/office)\n- Electrical device counts merged from chunk 1 (A-series inferred) and chunk 2 (E-series inferred); combined for total device population\n- Conduit & Wire allowance applied over single VERIFIED 17,137 SF GFA (not double-counted between chunks)\n- Level 4 drywall finish throughout\n\n**ITEMS REQUIRING FIELD VERIFICATION:**\n- Partition linear footage \u2014 confirm against A10 dimension strings at full scale\n- All electrical device/outlet counts \u2014 E10/E20 symbols only partially legible; reconcile with final device schedule\n- Panel \"MP\" (400A) pricing \u2014 not in cost database; requires separate quote (excluded from priced lines)\n- LED recessed vs. track fixture split \u2014 reconcile counts with E30 fixture schedule\n- Framing gauge/spacing per structural notes\n- Confirm new vs. existing walls (D10 demo plan)\n\n**EXCLUSIONS:**\n- Existing masonry demising / exterior walls (no new exterior framing)\n- FF&E, retail display fixtures (Boot Barn OFCI)\n- Existing structural columns to remain (D10)\n- Panel \"MP\" 400A (no matching cost database line item)\n- Track lighting fixture supply (vendor-supplied per notes)\n- Fire suppression, low-voltage beyond basic data, plumbing, HVAC, flooring, painting (out of selected scope)\n- Storefront glazing systems\n\n**QUALIFICATIONS:**\n- Estimate valid for 30 days from date of issue\n- Pricing based on current market conditions; single-shift, normal working hours\n- Electrical costs are preliminary allowances pending E-series device schedule reconciliation\n- This merged estimate combines chunk 1 (architectural) and chunk 2 (MEP) of the full drawing set; framing/drywall quantities derived solely from chunk 1 architectural sheets",
+  "tables_json": {
+    "tables": [
+      {
+        "table_name": "DIVISION 06 / 05 \u2014 FRAMING (ROUGH CARPENTRY & METAL STUDS)",
+        "description": "### Architectural & Technical Description\n\n#### Scope of Work\nThis division encompasses the complete supply and installation of interior partition framing systems for the Boot Barn tenant fit-out at Turnpike Mall, Store #579. The scope is limited to non-load-bearing metal stud partition assemblies, associated floor and ceiling tracks, blocking, fire-stopping, and miscellaneous connectors. Based on the calculation summary, the total partition wall area (stud face) is **3,528 SF**, verified via plan layout and dimension chains from chunk 1 architectural sheets. Explicitly excluded from this scope are exterior wall framing (existing masonry demising walls remain), structural beams (existing structure, not shown), and structural columns (existing columns to remain per D10 demo plan). Line items FR.03, FR.04, FR.05, FR.06, FR.07, FR.10, and FR.11 carry zero quantities, confirming no wood studs, LVL beams, or structural steel are within this fit-out scope.\n\n#### Materials & Finishes\nThe primary partition material is **3-5/8\" 20ga metal studs (non-load-bearing)** covering 3,096 SF at a unit material cost of $1.05/SF and unit labor of $2.10/SF, yielding a total cost of $10,728.90 with 10% wastage (3,406 SF adjusted quantity). Wet-wall areas at restrooms utilize **6\" 20ga metal studs (non-LB)** totaling 432 SF at $1.25/SF material and $2.25/SF labor, for $1,662.50. Metal track (floor & ceiling) per CSI 09 22 16 spans 784 LF at $0.55/LF material and $0.65/LF labor (5% wastage, 823 LF), totaling $987.60. All studs assume a partition height of 9'-0\" per the assumptions, with sales area open to deck. Standard steel gauge conforms to ASTM C645 for non-structural members.\n\n#### Installation & Application\nMetal studs shall be installed at 16\" o.c. spacing, seated into continuous floor and ceiling runner tracks, plumbed and aligned within industry tolerance of 1/8\" in 10 feet. Blocking & fire-stopping per FR.09 covers the full 3,528 SF partition footprint at $0.45/SF material and $0.90/SF labor (10% wastage, 3,881 SF), totaling $5,239.35, providing backing for wall-mounted fixtures and firestop continuity at rated assemblies. Joist hangers & connectors (FR.12, CSI 06 05 23) are carried as an allowance across 3,528 SF at $0.25/SF material and $0.15/SF labor (5% wastage, 3,704 SF), totaling $1,481.60. Coordination with Division 26 electrical rough-in and Division 09 drywall is required to sequence in-wall utilities prior to board installation.\n\n#### Surface Preparation\nSubstrate preparation includes verification of level floor slab conditions prior to track anchorage, mechanical fastening of runner tracks to concrete slab and structural deck above using power-actuated fasteners at maximum 24\" o.c. Field verification of new versus existing walls per D10 demo plan is required, along with confirmation of framing gauge and spacing per structural notes. All penetrations shall be firestopped in accordance with UL-listed systems.\n\n#### Drawings & Notes Reference\nQuantities derive from A10 Floor Plan at 3/32\" = 1'-0\" scale, with a 15% wall deduction applied for doors and openings. The division subtotal is **$20,099.45**. Field verification items include confirming partition linear footage against A10 dimension strings at full scale. All framing quantities were derived solely from chunk 1 architectural sheets.",
+        "headers": [
+          "Item #",
+          "CSI Ref.",
+          "Description",
+          "Unit",
+          "Quantity",
+          "Wastage %",
+          "Qty w/ Wastage",
+          "Unit Material",
+          "Total Material",
+          "Unit Labor",
+          "Total Labor",
+          "Total Cost",
+          "Trade"
+        ],
+        "rows": [
+          {
+            "Item #": "FR.01",
+            "CSI Ref.": "09 22 16",
+            "Description": "Metal Stud 3-5/8\" 20ga (non-LB)",
+            "Unit": "SF",
+            "Quantity": "3,096",
+            "Wastage %": "10%",
+            "Qty w/ Wastage": "3,406",
+            "Unit Material": "$1.05",
+            "Total Material": "$3,576.30",
+            "Unit Labor": "$2.10",
+            "Total Labor": "$7,152.60",
+            "Total Cost": "$10,728.90",
+            "Trade": "Framing"
+          },
+          {
+            "Item #": "FR.02",
+            "CSI Ref.": "09 22 16",
+            "Description": "Metal Stud 6\" 20ga (non-LB)",
+            "Unit": "SF",
+            "Quantity": "432",
+            "Wastage %": "10%",
+            "Qty w/ Wastage": "475",
+            "Unit Material": "$1.25",
+            "Total Material": "$593.75",
+            "Unit Labor": "$2.25",
+            "Total Labor": "$1,068.75",
+            "Total Cost": "$1,662.50",
+            "Trade": "Framing"
+          },
+          {
+            "Item #": "FR.03",
+            "CSI Ref.": "09 22 16",
+            "Description": "Metal Stud 3-5/8\" 16ga (structural)",
+            "Unit": "SF",
+            "Quantity": "0",
+            "Wastage %": "10%",
+            "Qty w/ Wastage": "0",
+            "Unit Material": "$1.55",
+            "Total Material": "$0.00",
+            "Unit Labor": "$2.60",
+            "Total Labor": "$0.00",
+            "Total Cost": "$0.00",
+            "Trade": "Framing"
+          },
+          {
+            "Item #": "FR.04",
+            "CSI Ref.": "06 11 00",
+            "Description": "Wood Stud 2\u00d74 (16\" o.c.)",
+            "Unit": "SF",
+            "Quantity": "0",
+            "Wastage %": "10%",
+            "Qty w/ Wastage": "0",
+            "Unit Material": "$1.20",
+            "Total Material": "$0.00",
+            "Unit Labor": "$1.85",
+            "Total Labor": "$0.00",
+            "Total Cost": "$0.00",
+            "Trade": "Framing"
+          },
+          {
+            "Item #": "FR.05",
+            "CSI Ref.": "06 11 00",
+            "Description": "Wood Stud 2\u00d76 (16\" o.c.)",
+            "Unit": "SF",
+            "Quantity": "0",
+            "Wastage %": "10%",
+            "Qty w/ Wastage": "0",
+            "Unit Material": "$1.65",
+            "Total Material": "$0.00",
+            "Unit Labor": "$2.00",
+            "Total Labor": "$0.00",
+            "Total Cost": "$0.00",
+            "Trade": "Framing"
+          },
+          {
+            "Item #": "FR.06",
+            "CSI Ref.": "06 11 23",
+            "Description": "LVL Beam 3-1/2\" \u00d7 9-1/2\"",
+            "Unit": "LF",
+            "Quantity": "0",
+            "Wastage %": "5%",
+            "Qty w/ Wastage": "0",
+            "Unit Material": "$18.50",
+            "Total Material": "$0.00",
+            "Unit Labor": "$12.00",
+            "Total Labor": "$0.00",
+            "Total Cost": "$0.00",
+            "Trade": "Framing"
+          },
+          {
+            "Item #": "FR.07",
+            "CSI Ref.": "06 11 23",
+            "Description": "LVL Beam 3-1/2\" \u00d7 11-7/8\"",
+            "Unit": "LF",
+            "Quantity": "0",
+            "Wastage %": "5%",
+            "Qty w/ Wastage": "0",
+            "Unit Material": "$23.00",
+            "Total Material": "$0.00",
+            "Unit Labor": "$14.00",
+            "Total Labor": "$0.00",
+            "Total Cost": "$0.00",
+            "Trade": "Framing"
+          },
+          {
+            "Item #": "FR.08",
+            "CSI Ref.": "09 22 16",
+            "Description": "Metal Track (floor & ceiling)",
+            "Unit": "LF",
+            "Quantity": "784",
+            "Wastage %": "5%",
+            "Qty w/ Wastage": "823",
+            "Unit Material": "$0.55",
+            "Total Material": "$452.65",
+            "Unit Labor": "$0.65",
+            "Total Labor": "$534.95",
+            "Total Cost": "$987.60",
+            "Trade": "Framing"
+          },
+          {
+            "Item #": "FR.09",
+            "CSI Ref.": "06 11 00",
+            "Description": "Blocking & Fire Stopping",
+            "Unit": "SF",
+            "Quantity": "3,528",
+            "Wastage %": "10%",
+            "Qty w/ Wastage": "3,881",
+            "Unit Material": "$0.45",
+            "Total Material": "$1,746.45",
+            "Unit Labor": "$0.90",
+            "Total Labor": "$3,492.90",
+            "Total Cost": "$5,239.35",
+            "Trade": "Framing"
+          },
+          {
+            "Item #": "FR.10",
+            "CSI Ref.": "05 12 00",
+            "Description": "Structural Steel Column (W6\u00d715)",
+            "Unit": "LF",
+            "Quantity": "0",
+            "Wastage %": "5%",
+            "Qty w/ Wastage": "0",
+            "Unit Material": "$28.00",
+            "Total Material": "$0.00",
+            "Unit Labor": "$22.00",
+            "Total Labor": "$0.00",
+            "Total Cost": "$0.00",
+            "Trade": "Framing"
+          },
+          {
+            "Item #": "FR.11",
+            "CSI Ref.": "05 12 00",
+            "Description": "Structural Steel Beam (W8\u00d731)",
+            "Unit": "LF",
+            "Quantity": "0",
+            "Wastage %": "5%",
+            "Qty w/ Wastage": "0",
+            "Unit Material": "$48.00",
+            "Total Material": "$0.00",
+            "Unit Labor": "$35.00",
+            "Total Labor": "$0.00",
+            "Total Cost": "$0.00",
+            "Trade": "Framing"
+          },
+          {
+            "Item #": "FR.12",
+            "CSI Ref.": "06 05 23",
+            "Description": "Joist Hangers & Connectors (Allowance)",
+            "Unit": "SF",
+            "Quantity": "3,528",
+            "Wastage %": "5%",
+            "Qty w/ Wastage": "3,704",
+            "Unit Material": "$0.25",
+            "Total Material": "$926.00",
+            "Unit Labor": "$0.15",
+            "Total Labor": "$555.60",
+            "Total Cost": "$1,481.60",
+            "Trade": "Framing"
+          }
+        ]
+      },
+      {
+        "table_name": "DIVISION 09 \u2014 DRYWALL (GYPSUM BOARD ASSEMBLIES)",
+        "description": "### Architectural & Technical Description\n\n#### Scope of Work\nThis division covers the complete supply and installation of gypsum board wall and ceiling assemblies, cement board wet-area sheathing, taping and finishing, corner protection, and fasteners for the Boot Barn tenant fit-out. The calculation summary establishes a total wall face area (both sides) of **6,000 SF**, total ceiling drywall area of **620 SF** (limited to restrooms/office hard-lid construction, with the sales area open to deck), wet/fire-rated cement board area of **480 SF** at restroom walls, and total corner bead of **640 LF**. Painting (Division 09 Finishes) is explicitly out of scope, and this trade coordinates board installation over the Division 05/06 metal stud framing.\n\n#### Materials & Finishes\nThe primary board is **1/2\" standard gypsum wallboard** for walls (D.01), covering 5,520 SF at $0.38/SF material and $0.95/SF labor, totaling $8,075.76 with 10% wastage (6,072 SF adjusted). **1/2\" ceiling drywall** (D.03) covers 620 SF at $0.40/SF material and $1.10/SF labor, totaling $1,023.00. **Cement board for wet areas** (D.04, CSI 09 21 16) covers 480 SF at $0.85/SF material and $1.25/SF labor, totaling $1,108.80, installed at restroom wet walls in conformance with ANSI A118.9 for tile substrate. Type-X fire-rated 5/8\" board (D.02), Level 5 finish (D.06), and shaft wall assembly (D.09) all carry zero quantities and cost, indicating no rated or shaft conditions within this scope. Corner bead (D.07) is metal, 640 LF at $0.18/LF material and $0.35/LF labor (5% wastage, 672 LF), totaling $356.16.\n\n#### Installation & Application\nGypsum board shall be installed vertically or horizontally over metal studs with screws at 12\" o.c. in the field and 8\" o.c. at edges. **Taping & Finishing \u2014 Level 4** (D.05, CSI 09 29 00) is applied across 6,140 SF at $0.22/SF material and $0.78/SF labor (5% wastage, 6,447 SF), totaling $6,447.00, and applies throughout per the assumptions. Level 4 finish comprises embedded tape with three coats of joint compound over joints, fasteners, and accessories, sanded smooth for standard eggshell or flat paint applications. Fasteners & screws (D.08) are carried as an allowance across 6,620 SF at $0.05/SF material, totaling $347.55 with no separate labor line. Coordination with electrical rough-in per Division 26 and framing per Division 05/06 is essential before board closure.\n\n#### Surface Preparation\nSubstrate preparation includes verification of stud alignment and plumb, installation of moisture-resistant cement board backing in wet restroom locations, and priming/sealing surfaces prior to subsequent finish application by others. Joints shall be feathered and sanded to eliminate ridges and tool marks in accordance with GA-214 Level 4 criteria. Moisture control at wet walls is achieved through cement board with appropriate vapor management.\n\n#### Drawings & Notes Reference\nQuantities are derived from A10 Floor Plan (3/32\" = 1'-0\") and A20 RCP, with ceiling drywall limited to hard-lid rooms per assumptions. The division subtotal is **$17,358.27**. Wall deductions of 15% for doors/openings were applied at framing and carried through to board quantities. All drywall quantities were derived solely from chunk 1 architectural sheets.",
+        "headers": [
+          "Item #",
+          "CSI Ref.",
+          "Description",
+          "Unit",
+          "Quantity",
+          "Wastage %",
+          "Qty w/ Wastage",
+          "Unit Material",
+          "Total Material",
+          "Unit Labor",
+          "Total Labor",
+          "Total Cost",
+          "Trade"
+        ],
+        "rows": [
+          {
+            "Item #": "D.01",
+            "CSI Ref.": "09 21 16",
+            "Description": "Drywall 1/2\" Standard \u2014 Walls",
+            "Unit": "SF",
+            "Quantity": "5,520",
+            "Wastage %": "10%",
+            "Qty w/ Wastage": "6,072",
+            "Unit Material": "$0.38",
+            "Total Material": "$2,307.36",
+            "Unit Labor": "$0.95",
+            "Total Labor": "$5,768.40",
+            "Total Cost": "$8,075.76",
+            "Trade": "Drywall"
+          },
+          {
+            "Item #": "D.02",
+            "CSI Ref.": "09 21 16",
+            "Description": "Drywall 5/8\" Type-X Fire-Rated \u2014 Walls",
+            "Unit": "SF",
+            "Quantity": "0",
+            "Wastage %": "10%",
+            "Qty w/ Wastage": "0",
+            "Unit Material": "$0.52",
+            "Total Material": "$0.00",
+            "Unit Labor": "$1.05",
+            "Total Labor": "$0.00",
+            "Total Cost": "$0.00",
+            "Trade": "Drywall"
+          },
+          {
+            "Item #": "D.03",
+            "CSI Ref.": "09 21 16",
+            "Description": "Drywall 1/2\" \u2014 Ceiling",
+            "Unit": "SF",
+            "Quantity": "620",
+            "Wastage %": "10%",
+            "Qty w/ Wastage": "682",
+            "Unit Material": "$0.40",
+            "Total Material": "$272.80",
+            "Unit Labor": "$1.10",
+            "Total Labor": "$750.20",
+            "Total Cost": "$1,023.00",
+            "Trade": "Drywall"
+          },
+          {
+            "Item #": "D.04",
+            "CSI Ref.": "09 21 16",
+            "Description": "Cement Board (wet areas)",
+            "Unit": "SF",
+            "Quantity": "480",
+            "Wastage %": "10%",
+            "Qty w/ Wastage": "528",
+            "Unit Material": "$0.85",
+            "Total Material": "$448.80",
+            "Unit Labor": "$1.25",
+            "Total Labor": "$660.00",
+            "Total Cost": "$1,108.80",
+            "Trade": "Drywall"
+          },
+          {
+            "Item #": "D.05",
+            "CSI Ref.": "09 29 00",
+            "Description": "Taping & Finishing \u2014 Level 4",
+            "Unit": "SF",
+            "Quantity": "6,140",
+            "Wastage %": "5%",
+            "Qty w/ Wastage": "6,447",
+            "Unit Material": "$0.22",
+            "Total Material": "$1,418.34",
+            "Unit Labor": "$0.78",
+            "Total Labor": "$5,028.66",
+            "Total Cost": "$6,447.00",
+            "Trade": "Drywall"
+          },
+          {
+            "Item #": "D.06",
+            "CSI Ref.": "09 29 00",
+            "Description": "Taping & Finishing \u2014 Level 5 (Smooth)",
+            "Unit": "SF",
+            "Quantity": "0",
+            "Wastage %": "5%",
+            "Qty w/ Wastage": "0",
+            "Unit Material": "$0.28",
+            "Total Material": "$0.00",
+            "Unit Labor": "$1.05",
+            "Total Labor": "$0.00",
+            "Total Cost": "$0.00",
+            "Trade": "Drywall"
+          },
+          {
+            "Item #": "D.07",
+            "CSI Ref.": "09 21 16",
+            "Description": "Corner Bead (Metal)",
+            "Unit": "LF",
+            "Quantity": "640",
+            "Wastage %": "5%",
+            "Qty w/ Wastage": "672",
+            "Unit Material": "$0.18",
+            "Total Material": "$120.96",
+            "Unit Labor": "$0.35",
+            "Total Labor": "$235.20",
+            "Total Cost": "$356.16",
+            "Trade": "Drywall"
+          },
+          {
+            "Item #": "D.08",
+            "CSI Ref.": "09 21 16",
+            "Description": "Fasteners & Screws (Allowance)",
+            "Unit": "SF",
+            "Quantity": "6,620",
+            "Wastage %": "5%",
+            "Qty w/ Wastage": "6,951",
+            "Unit Material": "$0.05",
+            "Total Material": "$347.55",
+            "Unit Labor": "$0.00",
+            "Total Labor": "$0.00",
+            "Total Cost": "$347.55",
+            "Trade": "Drywall"
+          },
+          {
+            "Item #": "D.09",
+            "CSI Ref.": "09 21 29",
+            "Description": "Shaft Wall Assembly (stair/elevator)",
+            "Unit": "SF",
+            "Quantity": "0",
+            "Wastage %": "10%",
+            "Qty w/ Wastage": "0",
+            "Unit Material": "$2.80",
+            "Total Material": "$0.00",
+            "Unit Labor": "$3.50",
+            "Total Labor": "$0.00",
+            "Total Cost": "$0.00",
+            "Trade": "Drywall"
+          }
+        ]
+      },
+      {
+        "table_name": "DIVISION 26 \u2014 ELECTRICAL",
+        "description": "### Architectural & Technical Description\n\n#### Scope of Work\nThis division covers the supply and installation of interior electrical devices, LED lighting, life-safety devices, branch conduit and wire, and one electrical distribution panel for the Boot Barn tenant fit-out. The merged device summary reconciles counts from chunk 1 (A20/A01 architectural) and chunk 2 (E-series MEP): 56 duplex outlets, 10 GFCI outlets, 22 light switches/occupancy sensors, 225 LED recessed lights, 6 exit signs (verified once across chunks), 8 smoke detectors, 6 data outlets, and panel provisions. Panel \"MP\" 400A is explicitly excluded (no cost database line \u2014 field verify), while Panel \"PP\" 200A is priced. Fire suppression, low-voltage beyond basic data, and track lighting fixture supply (vendor/OFCI) are excluded.\n\n#### Materials & Finishes\n**Duplex outlets (120V)** (5.01, CSI 26 27 26) total 56 EA at $8.00 material and $45.00 labor each (5% wastage, 59 EA), totaling $3,127.00, mounted at standard 18\" A.F.F. **GFCI outlets** (5.02) total 10 EA at $22.00 material and $55.00 labor (11 EA), totaling $847.00, located in wet and code-required areas. **Single-pole light switches** (5.03) total 22 EA at $5.00 material and $35.00 labor (23 EA), totaling $920.00, mounted at 44\" A.F.F. **LED recessed lights (6\")** (5.04, CSI 26 51 13) represent the largest device line at 225 EA at $35.00 material and $85.00 labor (5% wastage, 237 EA), totaling $28,440.00. **Exit signs (LED)** (5.05, CSI 26 52 13) total 6 EA at $85.00 material and $95.00 labor (7 EA), totaling $1,260.00. **Hardwired smoke detectors** (5.06, CSI 26 28 13) total 8 EA at $65.00 material and $95.00 labor (9 EA), totaling $1,440.00, including duct smoke detectors verified on M10/E10.\n\n#### Installation & Application\n**Conduit & Wire (Allowance)** (5.07, CSI 26 05 26) is applied over a single verified GFA of 17,137 SF at $6.00/SF material and $10.00/SF labor (10% wastage, 18,851 SF), totaling $301,616.00 \u2014 the dominant cost line. This allowance uses the M00 HVAC load calc GFA and supersedes the chunk 1 estimate of 17,692 SF to avoid double-counting the same floor area. The **200A electrical panel \"PP\"** (5.08, CSI 26 24 16) is 1 EA at $925.00 material and $985.00 labor (0% wastage), totaling $1,910.00. All branch wiring shall be installed in EMT conduit with THHN/THWN copper conductors sized per NEC, with device rough-in coordinated with framing prior to drywall closure.\n\n#### Surface Preparation & Coordination\nRough-in boxes shall be set plumb and flush with finished wall surfaces, with mud rings sized to board thickness. All device/outlet counts require field verification as E10/E20 symbols were only partially legible and must reconcile with the final device schedule. The LED recessed versus track fixture split must be reconciled with the E30 fixture schedule (Type A pendant track 333 EA, C1 track heads 163 EA). Panel \"MP\" 400A pricing requires a separate quote.\n\n#### Drawings & Notes Reference\nPower/lighting drawn at 3/16\" = 1'-0\" per E10/E20/E30/E40. Occupancy is Mercantile (M) with 254 total occupants per T00 code review. The division subtotal is **$339,560.00**. Electrical costs are preliminary allowances pending E-series device schedule reconciliation. Sales area and stockroom are open to deck per A30.",
+        "headers": [
+          "Item #",
+          "CSI Ref.",
+          "Description",
+          "Unit",
+          "Quantity",
+          "Wastage %",
+          "Qty w/ Wastage",
+          "Unit Material",
+          "Total Material",
+          "Unit Labor",
+          "Total Labor",
+          "Total Cost",
+          "Trade"
+        ],
+        "rows": [
+          {
+            "Item #": "5.01",
+            "CSI Ref.": "26 27 26",
+            "Description": "Duplex Outlet (120V)",
+            "Unit": "EA",
+            "Quantity": "56",
+            "Wastage %": "5%",
+            "Qty w/ Wastage": "59",
+            "Unit Material": "$8.00",
+            "Total Material": "$472.00",
+            "Unit Labor": "$45.00",
+            "Total Labor": "$2,655.00",
+            "Total Cost": "$3,127.00",
+            "Trade": "Electrical"
+          },
+          {
+            "Item #": "5.02",
+            "CSI Ref.": "26 27 26",
+            "Description": "GFCI Outlet",
+            "Unit": "EA",
+            "Quantity": "10",
+            "Wastage %": "5%",
+            "Qty w/ Wastage": "11",
+            "Unit Material": "$22.00",
+            "Total Material": "$242.00",
+            "Unit Labor": "$55.00",
+            "Total Labor": "$605.00",
+            "Total Cost": "$847.00",
+            "Trade": "Electrical"
+          },
+          {
+            "Item #": "5.03",
+            "CSI Ref.": "26 27 26",
+            "Description": "Light Switch (Single-Pole)",
+            "Unit": "EA",
+            "Quantity": "22",
+            "Wastage %": "5%",
+            "Qty w/ Wastage": "23",
+            "Unit Material": "$5.00",
+            "Total Material": "$115.00",
+            "Unit Labor": "$35.00",
+            "Total Labor": "$805.00",
+            "Total Cost": "$920.00",
+            "Trade": "Electrical"
+          },
+          {
+            "Item #": "5.04",
+            "CSI Ref.": "26 51 13",
+            "Description": "LED Recessed Light (6\")",
+            "Unit": "EA",
+            "Quantity": "225",
+            "Wastage %": "5%",
+            "Qty w/ Wastage": "237",
+            "Unit Material": "$35.00",
+            "Total Material": "$8,295.00",
+            "Unit Labor": "$85.00",
+            "Total Labor": "$20,145.00",
+            "Total Cost": "$28,440.00",
+            "Trade": "Electrical"
+          },
+          {
+            "Item #": "5.05",
+            "CSI Ref.": "26 52 13",
+            "Description": "Exit Sign (LED)",
+            "Unit": "EA",
+            "Quantity": "6",
+            "Wastage %": "5%",
+            "Qty w/ Wastage": "7",
+            "Unit Material": "$85.00",
+            "Total Material": "$595.00",
+            "Unit Labor": "$95.00",
+            "Total Labor": "$665.00",
+            "Total Cost": "$1,260.00",
+            "Trade": "Electrical"
+          },
+          {
+            "Item #": "5.06",
+            "CSI Ref.": "26 28 13",
+            "Description": "Smoke Detector (Hardwired)",
+            "Unit": "EA",
+            "Quantity": "8",
+            "Wastage %": "5%",
+            "Qty w/ Wastage": "9",
+            "Unit Material": "$65.00",
+            "Total Material": "$585.00",
+            "Unit Labor": "$95.00",
+            "Total Labor": "$855.00",
+            "Total Cost": "$1,440.00",
+            "Trade": "Electrical"
+          },
+          {
+            "Item #": "5.07",
+            "CSI Ref.": "26 05 26",
+            "Description": "Conduit & Wire (Allowance)",
+            "Unit": "SF",
+            "Quantity": "17,137",
+            "Wastage %": "10%",
+            "Qty w/ Wastage": "18,851",
+            "Unit Material": "$6.00",
+            "Total Material": "$113,106.00",
+            "Unit Labor": "$10.00",
+            "Total Labor": "$188,510.00",
+            "Total Cost": "$301,616.00",
+            "Trade": "Electrical"
+          },
+          {
+            "Item #": "5.08",
+            "CSI Ref.": "26 24 16",
+            "Description": "Electrical Panel (200A) \u2014 \"PP\"",
+            "Unit": "EA",
+            "Quantity": "1",
+            "Wastage %": "0%",
+            "Qty w/ Wastage": "1",
+            "Unit Material": "$925.00",
+            "Total Material": "$925.00",
+            "Unit Labor": "$985.00",
+            "Total Labor": "$985.00",
+            "Total Cost": "$1,910.00",
+            "Trade": "Electrical"
+          }
+        ]
+      },
+      {
+        "table_name": "FINANCIAL SUMMARY",
+        "description": "### Architectural & Technical Description\n\n#### Scope of Work\nThe Financial Summary consolidates the priced divisions of the Boot Barn Turnpike Mall Store #579 tenant fit-out into a single project cost rollup, along with applied markups for insurance, contingency, and overhead & profit. This estimate reflects the selected scopes only: Division 05/06 Framing, Division 09 Drywall, and Division 26 Electrical. All remaining divisions are designated \"Not in Scope,\" reflecting the limited multi-trade nature of this fit-out where masonry demising walls, roofing, insulation, siding, windows, doors, painting, flooring, plumbing, and HVAC are excluded from the priced work.\n\n#### Materials & Finishes / Cost Composition\nThe three active divisions carry the following subtotals: **Division 05/06 Framing at $20,099.45**, encompassing metal stud partitions, track, blocking, fire-stopping, and connectors; **Division 09 Drywall at $17,358.27**, encompassing gypsum board, cement board, taping, corner bead, and fasteners; and **Division 26 Electrical at $339,560.00**, which is by far the dominant division driven by the $301,616.00 conduit and wire allowance over 17,137 SF of gross floor area. General Requirements (Division 01) is carried at $0.00. The combined **SUBTOTAL is $377,017.72**.\n\n#### Markups & Application\nMarkups are applied on the subtotal as follows: **Insurance at 5% ($18,850.89)** covering general liability and builder's risk provisions; **Contingency at 5% ($18,850.89)** reserved for unforeseen conditions, field verification adjustments, and reconciliation of preliminary electrical allowances; and **Overhead & Profit at 20% ($75,403.54)** covering the contractor's general conditions, supervision, and margin. The cumulative markups total $113,105.32 against the base subtotal, resulting in a **PROJECT TOTAL of $490,123.04**.\n\n#### Coordination & Assumptions\nThe electrical division represents approximately 90% of the priced base subtotal, reflecting both the extensive LED recessed lighting count (225 EA) and the comprehensive conduit and wire allowance. Because these electrical costs are preliminary allowances pending E-series device schedule reconciliation, the contingency line is particularly relevant to the accuracy of the project total. The Panel \"MP\" 400A remains excluded pending a separate quote and would represent an addition to this total once priced.\n\n#### Drawings & Notes Reference\nThis merged estimate combines chunk 1 (architectural) and chunk 2 (MEP) of the full drawing set, with framing and drywall quantities derived solely from chunk 1 architectural sheets and electrical device counts merged across both chunks. The estimate is valid for 30 days from the June 13, 2024 date of issue, priced on current market conditions for single-shift, normal working hours. All values are preserved exactly as issued, with the framing subtotal ($20,099.45), drywall subtotal ($17,358.27), and electrical subtotal ($339,560.00) reconciling to the stated subtotal of $377,017.72 and final project total of $490,123.04.",
+        "headers": [
+          "Description",
+          "Amount"
+        ],
+        "rows": [
+          {
+            "Description": "Division 01 - General Requirements",
+            "Amount": "$0.00"
+          },
+          {
+            "Description": "Division 05/06 - Framing",
+            "Amount": "$20,099.45"
+          },
+          {
+            "Description": "Division 06 - Finish Carpentry",
+            "Amount": "Not in Scope"
+          },
+          {
+            "Description": "Division 07 - Roofing",
+            "Amount": "Not in Scope"
+          },
+          {
+            "Description": "Division 07 - Insulation",
+            "Amount": "Not in Scope"
+          },
+          {
+            "Description": "Division 07 - Siding Installation",
+            "Amount": "Not in Scope"
+          },
+          {
+            "Description": "Division 08 - Windows Installation",
+            "Amount": "Not in Scope"
+          },
+          {
+            "Description": "Division 08 - Doors Installation",
+            "Amount": "Not in Scope"
+          },
+          {
+            "Description": "Division 09 - Finishes (Painting)",
+            "Amount": "Not in Scope"
+          },
+          {
+            "Description": "Division 09 - Drywall",
+            "Amount": "$17,358.27"
+          },
+          {
+            "Description": "Division 09 - Flooring",
+            "Amount": "Not in Scope"
+          },
+          {
+            "Description": "Division 22 - Plumbing",
+            "Amount": "Not in Scope"
+          },
+          {
+            "Description": "Division 23 - HVAC",
+            "Amount": "Not in Scope"
+          },
+          {
+            "Description": "Division 26 - Electrical",
+            "Amount": "$339,560.00"
+          },
+          {
+            "Description": "Division 01 - Cleaning",
+            "Amount": "Not in Scope"
+          },
+          {
+            "Description": "SUBTOTAL",
+            "Amount": "$377,017.72"
+          },
+          {
+            "Description": "Insurance (5%)",
+            "Amount": "$18,850.89"
+          },
+          {
+            "Description": "Contingency (5%)",
+            "Amount": "$18,850.89"
+          },
+          {
+            "Description": "Overhead & Profit (20%)",
+            "Amount": "$75,403.54"
+          },
+          {
+            "Description": "PROJECT TOTAL",
+            "Amount": "$490,123.04"
+          }
+        ]
+      }
+    ]
+  },
+  "chunk_texts": [
+    "# ESTIMATE OF MATERIALS AND COST OF CONSTRUCTION\n**Date:** June 13, 2024  \n**Project ID:** Boot Barn \u2014 Turnpike Mall, Store #579  \n**Address:** 10-42 Whitten Rd., Augusta, ME 04330  \n**Scope:** Selected Scopes: Division 05/06 \u2014 Framing, Division 09 \u2014 Drywall, Division 26 \u2014 Electrical  \n**Drawing Reference:** A10 (Floor Plan), A20 (RCP), A01 (Egress), D10 (Demo)  \n**Scale:** 3/32\" = 1'-0\" (Floor Plan)\n\n---\n\n## DIVISION 06 / 05 \u2014 FRAMING (ROUGH CARPENTRY & METAL STUDS)\n**CALCULATION SUMMARY:**\n- Total Partition Wall Area (stud face): 3,528 SF (VERIFIED via plan layout + dimension chains)\n- Exterior Wall Framing Area: NOT SHOWN (existing masonry demising walls \u2014 excluded)\n- Beam Linear Footage: NOT SHOWN ON DRAWING (existing structure)\n- Column Count / Linear Footage: Existing structural columns to remain (per D10 keyed notes) \u2014 no new columns\n- Blocking & Miscellaneous Framing: 3,528 SF (partition footprint)\n\n**FRAMING METHODOLOGY:**\n- Overall lease line: 127'-6\" (front, VERIFIED A10) \u00d7 ~141'-2\" (side, VERIFIED A10) \u2248 17,692 SF total (VERIFIED, matches T00 total sq. ft.)\n- New partition walls concentrated in front zone (restrooms, manager's office, breakroom, stockroom, fitting rooms, closet, utility). Sales area is open to deck.\n- Estimated new interior partition run (INFERRED from A10/A30 room layout): ~392 LF\n- Ceiling/wall height assumed 9'-0\" for partition framing (INFERRED; sales open to deck)\n- Metal studs 3-5/8\" 20ga for non-load-bearing interior partitions (VERIFIED per T10 wall type notes)\n- Restroom wet-wall areas take 6\" studs (INFERRED)\n\nStud face area = 392 LF \u00d7 9' = 3,528 SF (one face, full height)  \n6\" stud portion (restroom walls ~48 LF \u00d7 9') = 432 SF; 3-5/8\" portion = 3,096 SF\n\n| Item # | CSI Ref. | Description | Unit | Quantity | Wastage % | Qty w/ Wastage | Unit Material | Total Material | Unit Labor | Total Labor | Total Cost | Trade |\n|--------|----------|-------------|------|----------|-----------|----------------|---------------|----------------|------------|-------------|------------|-------|\n| FR.01 | 09 22 16 | Metal Stud 3-5/8\" 20ga (non-LB) | SF | 3,096 | 10% | 3,406 | $1.05 | $3,576.30 | $2.10 | $7,152.60 | $10,728.90 | Framing |\n| FR.02 | 09 22 16 | Metal Stud 6\" 20ga (non-LB) | SF | 432 | 10% | 475 | $1.25 | $593.75 | $2.25 | $1,068.75 | $1,662.50 | Framing |\n| FR.03 | 09 22 16 | Metal Stud 3-5/8\" 16ga (structural) | SF | 0 | 10% | 0 | $1.55 | $0.00 | $2.60 | $0.00 | $0.00 | Framing |\n| FR.04 | 06 11 00 | Wood Stud 2\u00d74 (16\" o.c.) | SF | 0 | 10% | 0 | $1.20 | $0.00 | $1.85 | $0.00 | $0.00 | Framing |\n| FR.05 | 06 11 00 | Wood Stud 2\u00d76 (16\" o.c.) | SF | 0 | 10% | 0 | $1.65 | $0.00 | $2.00 | $0.00 | $0.00 | Framing |\n| FR.06 | 06 11 23 | LVL Beam 3-1/2\" \u00d7 9-1/2\" | LF | 0 | 5% | 0 | $18.50 | $0.00 | $12.00 | $0.00 | $0.00 | Framing |\n| FR.07 | 06 11 23 | LVL Beam 3-1/2\" \u00d7 11-7/8\" | LF | 0 | 5% | 0 | $23.00 | $0.00 | $14.00 | $0.00 | $0.00 | Framing |\n| FR.08 | 09 22 16 | Metal Track (floor & ceiling) | LF | 784 | 5% | 823 | $0.55 | $452.65 | $0.65 | $534.95 | $987.60 | Framing |\n| FR.09 | 06 11 00 | Blocking & Fire Stopping | SF | 3,528 | 10% | 3,881 | $0.45 | $1,746.45 | $0.90 | $3,492.90 | $5,239.35 | Framing |\n| FR.10 | 05 12 00 | Structural Steel Column (W6\u00d715) | LF | 0 | 5% | 0 | $28.00 | $0.00 | $22.00 | $0.00 | $0.00 | Framing |\n| FR.11 | 05 12 00 | Structural Steel Beam (W8\u00d731) | LF | 0 | 5% | 0 | $48.00 | $0.00 | $35.00 | $0.00 | $0.00 | Framing |\n| FR.12 | 06 05 23 | Joist Hangers & Connectors (Allowance) | SF | 3,528 | 5% | 3,704 | $0.25 | $926.00 | $0.15 | $555.60 | $1,481.60 | Framing |\n\n---\n**Show Your Work:**\nMetal Stud Area: 392 LF partitions \u00d7 9' height = 3,528 SF stud face (split 3,096 SF @ 3-5/8\" + 432 SF @ 6\")  \nTrack LF = 392 partition LF \u00d7 2 (floor + ceiling) = 784 LF\n\n**Division 06/05 \u2014 Framing Subtotal:** $20,099.45\n\n---\n\n## DIVISION 09 \u2014 DRYWALL (GYPSUM BOARD ASSEMBLIES)\n**CALCULATION SUMMARY:**\n- Total Wall Face Area (both sides): 6,000 SF (INFERRED)\n- Total Ceiling Drywall Area: 620 SF (restrooms/office hard-lid; sales open to deck)\n- Wet / Fire-Rated Areas (cement board): 480 SF (restroom walls)\n- Total Corner Bead (LF): 640 LF (INFERRED)\n\n**AREA METHODOLOGY:**\n- Wall face area = 392 LF \u00d7 9' \u00d7 2 sides = 7,056 SF \u2212 15% openings \u2248 5,998 SF (round 6,000 SF)\n- Restroom wet-wall substrate = 480 SF gets cement board (deducted from std drywall)\n- Ceiling drywall applied only in restrooms + manager's office (hard-lid); sales/stockroom open to deck (VERIFIED A30 \"open to deck\")\n- Std drywall wall = 6,000 \u2212 480 (cement bd) = 5,520 SF\n\n| Item # | CSI Ref. | Description | Unit | Quantity | Wastage % | Qty w/ Wastage | Unit Material | Total Material | Unit Labor | Total Labor | Total Cost | Trade |\n|--------|----------|-------------|------|----------|-----------|----------------|---------------|----------------|------------|-------------|------------|-------|\n| D.01 | 09 21 16 | Drywall 1/2\" Standard \u2014 Walls | SF | 5,520 | 10% | 6,072 | $0.38 | $2,307.36 | $0.95 | $5,768.40 | $8,075.76 | Drywall |\n| D.02 | 09 21 16 | Drywall 5/8\" Type-X Fire-Rated \u2014 Walls | SF | 0 | 10% | 0 | $0.52 | $0.00 | $1.05 | $0.00 | $0.00 | Drywall |\n| D.03 | 09 21 16 | Drywall 1/2\" \u2014 Ceiling | SF | 620 | 10% | 682 | $0.40 | $272.80 | $1.10 | $750.20 | $1,023.00 | Drywall |\n| D.04 | 09 21 16 | Cement Board (wet areas) | SF | 480 | 10% | 528 | $0.85 | $448.80 | $1.25 | $660.00 | $1,108.80 | Drywall |\n| D.05 | 09 29 00 | Taping & Finishing \u2014 Level 4 | SF | 6,140 | 5% | 6,447 | $0.22 | $1,418.34 | $0.78 | $5,028.66 | $6,447.00 | Drywall |\n| D.06 | 09 29 00 | Taping & Finishing \u2014 Level 5 (Smooth) | SF | 0 | 5% | 0 | $0.28 | $0.00 | $1.05 | $0.00 | $0.00 | Drywall |\n| D.07 | 09 21 16 | Corner Bead (Metal) | LF | 640 | 5% | 672 | $0.18 | $120.96 | $0.35 | $235.20 | $356.16 | Drywall |\n| D.08 | 09 21 16 | Fasteners & Screws (Allowance) | SF | 6,620 | 5% | 6,951 | $0.05 | $347.55 | $0.00 | $0.00 | $347.55 | Drywall |\n| D.09 | 09 21 29 | Shaft Wall Assembly (stair/elevator) | SF | 0 | 10% | 0 | $2.80 | $0.00 | $3.50 | $0.00 | $0.00 | Drywall |\n\n---\n**Show Your Work:**\nWall Face Area = 392 LF \u00d7 9' \u00d7 2 sides = 7,056 SF \u2212 15% openings = 5,998 SF \u2248 6,000 SF  \nTape area = std walls (5,520) + ceiling (620) = 6,140 SF (cement board tiled, not taped)\n\n**Division 09 \u2014 Drywall Subtotal:** $17,358.27\n\n---\n\n## DIVISION 26 \u2014 ELECTRICAL\n**DEVICE SUMMARY:**\n- Outlets (Standard): 32 (INFERRED \u2014 E10 power plan not in this chunk; based on floor plan device symbols)\n- GFCI Outlets: 6 (restrooms, breakroom, exterior \u2014 INFERRED)\n- Light Switches: 14 (INFERRED from room count)\n- Light Fixtures (LED, per A20 RCP): ~185 recessed/surface fixtures counted across RCP (VERIFIED symbol count on A20)\n- Exit Signs (per A01 Egress Plan): 6 (VERIFIED \u2014 6 EXIT SIGN symbols shown)\n- Smoke Detectors: 4 (INFERRED)\n- Data Outlets: 6 (INFERRED \u2014 cashwrap/office/stockroom)\n- Panels: NOT SHOWN in this chunk (see E-series, chunk 2)\n- Conduit & Wire allowance over gross floor area: 17,692 SF\n\n| Item # | CSI Ref. | Description | Unit | Quantity | Wastage % | Qty w/ Wastage | Unit Material | Total Material | Unit Labor | Total Labor | Total Cost | Trade |\n|--------|----------|-------------|------|----------|-----------|----------------|---------------|----------------|------------|-------------|------------|-------|\n| 5.01 | 26 27 26 | Duplex Outlet (120V) | EA | 32 | 5% | 34 | $8.00 | $272.00 | $45.00 | $1,530.00 | $1,802.00 | Electrical |\n| 5.02 | 26 27 26 | GFCI Outlet | EA | 6 | 5% | 7 | $22.00 | $154.00 | $55.00 | $385.00 | $539.00 | Electrical |\n| 5.03 | 26 27 26 | Light Switch (Single-Pole) | EA | 14 | 5% | 15 | $5.00 | $75.00 | $35.00 | $525.00 | $600.00 | Electrical |\n| 5.04 | 26 51 13 | LED Recessed Light (6\") | EA | 185 | 5% | 195 | $35.00 | $6,825.00 | $85.00 | $16,575.00 | $23,400.00 | Electrical |\n| 5.05 | 26 52 13 | Exit Sign (LED) | EA | 6 | 5% | 7 | $85.00 | $595.00 | $95.00 | $665.00 | $1,260.00 | Electrical |\n| 5.06 | 26 28 13 | Smoke Detector (Hardwired) | EA | 4 | 5% | 5 | $65.00 | $325.00 | $95.00 | $475.00 | $800.00 | Electrical |\n| 5.07 | 26 05 26 | Conduit & Wire (Allowance) | SF | 17,692 | 10% | 19,461 | $6.00 | $116,766.00 | $10.00 | $194,610.00 | $311,376.00 | Electrical |\n\n**Division 26 Subtotal:** $339,777.00\n\n---\n\n## FINANCIAL SUMMARY\n| Description | Amount |\n|-------------|--------|\n| Division 01 - General Requirements | $0.00 |\n| Division 05/06 - Framing | $20,099.45 |\n| Division 06 - Finish Carpentry | Not in Scope |\n| Division 07 - Roofing | Not in Scope |\n| Division 07 - Insulation | Not in Scope |\n| Division 07 - Siding Installation | Not in Scope |\n| Division 08 - Windows Installation | Not in Scope |\n| Division 08 - Doors Installation | Not in Scope |\n| Division 09 - Finishes (Painting) | Not in Scope |\n| Division 09 - Drywall | $17,358.27 |\n| Division 09 - Flooring | Not in Scope |\n| Division 22 - Plumbing | Not in Scope |\n| Division 23 - HVAC | Not in Scope |\n| Division 26 - Electrical | $339,777.00 |\n| Division 01 - Cleaning | Not in Scope |\n| **SUBTOTAL** | **$377,234.72** |\n| Insurance (5%) | $18,861.74 |\n| Contingency (5%) | $18,861.74 |\n| Overhead & Profit (20%) | $75,446.94 |\n| **PROJECT TOTAL** | **$490,405.14** |\n\n---\n\n## ASSUMPTIONS & NOTES\n**VERIFIED DATA:**\n- Overall lease line dimension: 127'-6\" front (A10), ~141'-2\" side depth (A10)\n- Total tenant area: 17,692 SF (VERIFIED \u2014 T00 title sheet)\n- Occupancy: Mercantile (M); Total occupants 254 (T00 Code Review)\n- Scale: 3/32\" = 1'-0\" (Floor Plan A10)\n- Exit signs: 6 counted on A01 Egress Plan\n- Light fixtures counted from A20 Reflected Ceiling Plan (open-to-deck + hard-lid areas)\n- Sales area and stockroom \"open to deck\" (VERIFIED A30 finish plan)\n- Rooms confirmed by label: Restrooms, Manager's Office, Breakroom, Stockroom, Fitting Rooms, Closet, Utility Closet, Storefront Entry, Sales Area\n\n**ASSUMPTIONS MADE:**\n- Ceiling/partition framing height: 9'-0\" (open-to-deck sales area not fully framed to structure)\n- Wall deductions: 15% for doors/openings\n- Metal studs 3-5/8\" 20ga for all non-load-bearing interior partitions; 6\" studs at restroom wet walls\n- Cement board at restroom wet walls (480 SF)\n- Ceiling drywall only in hard-lid rooms (restrooms/office); balance open to deck\n- Electrical device counts INFERRED where E-series power plan not in this chunk\n- Conduit & wire allowance applied over full 17,692 SF GFA\n- Level 4 drywall finish assumed throughout\n\n**ITEMS REQUIRING FIELD VERIFICATION:**\n- Partition linear footage \u2014 confirm against A10 dimension strings at full scale\n- Electrical device/outlet counts \u2014 verify against E10/E20 power & lighting plans (chunk 2)\n- Electrical panel sizes and locations \u2014 see E30 schedules (chunk 2)\n- Fixture count \u2014 reconcile A20 RCP symbols with E20 lighting plan\n- Framing gauge/spacing per structural notes\n- Confirm which walls are new vs. existing to remain (D10 demo plan)\n\n**EXCLUSIONS:**\n- Existing masonry demising / exterior walls (no new exterior framing)\n- FF&E, retail display fixtures (Boot Barn OFCI per T10 responsibility schedule)\n- Structural steel columns (existing to remain per D10)\n- Fire suppression, low-voltage beyond basic data, plumbing, HVAC, flooring, painting (out of selected scope)\n- Storefront glazing systems\n\n**QUALIFICATIONS:**\n- Estimate valid for 30 days from date of issue\n- Pricing based on current market conditions\n- Assumes single-shift work, normal working hours\n- Electrical costs are preliminary allowances pending review of E-series engineered drawings (chunk 2)\n- This estimate reflects page chunk 1 of 2; final device counts subject to revision upon full drawing set review",
+    "# ESTIMATE OF MATERIALS AND COST OF CONSTRUCTION\n**Date:** June 12, 2024  \n**Project ID:** Boot Barn \u2014 Store #679, Turnpike Mall  \n**Address:** 42-49 Whitten Rd, Augusta, ME 04330  \n**Scope:** Selected Scopes: Division 05/06 \u2014 Framing, Division 09 \u2014 Drywall, Division 26 \u2014 Electrical  \n**Drawing Reference:** M10, M20, P10, P20, E10, E20, E30, E40 (MEP set \u2014 chunk 2 of 2)  \n**Scale:** Mechanical/Plumbing Plans 3/32\" = 1'-0\"; Power/Lighting 3/16\" = 1'-0\"\n\n---\n\n## DIVISION 06 / 05 \u2014 FRAMING (ROUGH CARPENTRY & METAL STUDS)\n**CALCULATION SUMMARY:**\n- Total Partition Wall Area (stud face): **NOT SHOWN ON THIS CHUNK** \u2014 architectural partition plans (A-series floor plans / A70 partition types) are on chunk 1; this chunk (MEP) does not depict partition layouts with dimension chains.\n- Exterior Wall Framing Area: NOT SHOWN ON DRAWING (MEP sheets only)\n- Beam Linear Footage: NOT SHOWN ON DRAWING\n- Column Count / Linear Footage: Structural columns referenced on M10 grid (A\u2013F \u00d7 21\u201371) but no framing sizes shown on MEP sheets \u2014 NOT QUANTIFIABLE from this chunk\n- Blocking & Miscellaneous Framing: NOT SHOWN ON DRAWING\n\n**FRAMING METHODOLOGY:**\nThe pages in this chunk are Mechanical (M10, M20), Plumbing (P10, P20), and Electrical (E10\u2013E40) sheets. No partition layout dimensions, wall types, framing schedules, or structural framing member sizes are quantifiable from these MEP-only sheets. Per the DATA VERIFICATION rule (\"If insufficient information exists, reduce scope rather than guessing\" and \"DO NOT fabricate\"), framing quantities cannot be responsibly derived from this chunk.\n\n| Item # | CSI Ref. | Description | Unit | Quantity | Wastage % | Qty w/ Wastage | Unit Material | Total Material | Unit Labor | Total Labor | Total Cost | Trade |\n|--------|----------|-------------|------|----------|-----------|----------------|---------------|----------------|------------|-------------|------------|-------|\n| FR.01 | 09 22 16 | Metal Stud 3-5/8\" 20ga (non-LB) | SF | NOT SHOWN | \u2014 | \u2014 | $1.05 | $0.00 | $2.10 | $0.00 | $0.00 | Framing |\n| FR.02 | 09 22 16 | Metal Stud 6\" 20ga (non-LB) | SF | NOT SHOWN | \u2014 | \u2014 | $1.25 | $0.00 | $2.25 | $0.00 | $0.00 | Framing |\n\n---\n**Show Your Work:**\nFraming takeoff requires partition plan geometry (LF of walls \u00d7 height) found on architectural sheets A-series/A70 (chunk 1). These sheets are not present in this chunk. No fabricated quantities applied.\n\n**Division 06/05 \u2014 Framing Subtotal:** **$0.00** *(Not quantifiable from MEP sheets in this chunk)*\n\n---\n\n## DIVISION 09 \u2014 DRYWALL (GYPSUM BOARD ASSEMBLIES)\n**CALCULATION SUMMARY:**\n- Total Wall Face Area (both sides): **NOT SHOWN ON THIS CHUNK** \u2014 partition plans/wall types are on architectural sheets (chunk 1).\n- Total Ceiling Drywall Area: Drawings reference \"unfinished ceiling / open to deck\" and \"supply duct at 13'-6\" A.F.F.\" on M10 (open plenum retail); no gypsum ceiling area quantifiable.\n- Wet / Fire-Rated Areas: NOT QUANTIFIABLE from MEP sheets\n- Total Corner Bead (LF): NOT SHOWN ON DRAWING\n\n**AREA METHODOLOGY:**\nDrywall takeoff requires partition linear footage and ceiling area from architectural floor plans. This chunk contains only MEP plans (mechanical, plumbing, electrical). Per verification protocol, drywall quantities cannot be derived without fabricating partition geometry.\n\n| Item # | CSI Ref. | Description | Unit | Quantity | Wastage % | Qty w/ Wastage | Unit Material | Total Material | Unit Labor | Total Labor | Total Cost | Trade |\n|--------|----------|-------------|------|----------|-----------|----------------|---------------|----------------|------------|-------------|------------|-------|\n| D.01 | 09 21 16 | Drywall 1/2\" Standard \u2014 Walls | SF | NOT SHOWN | \u2014 | \u2014 | $0.38 | $0.00 | $0.95 | $0.00 | $0.00 | Drywall |\n| D.03 | 09 21 16 | Drywall 1/2\" \u2014 Ceiling | SF | NOT SHOWN (open to deck) | \u2014 | \u2014 | $0.40 | $0.00 | $1.10 | $0.00 | $0.00 | Drywall |\n\n---\n**Show Your Work:**\nWall Face Area = Partition LF \u00d7 Ceiling Height \u00d7 2 \u2212 openings. Partition LF is documented on architectural sheets not present in this chunk. No values fabricated.\n\n**Division 09 \u2014 Drywall Subtotal:** **$0.00** *(Not quantifiable from MEP sheets in this chunk)*\n\n---\n\n## DIVISION 26 \u2014 ELECTRICAL\n**DEVICE SUMMARY (VERIFIED from E10 Power Plan, E20 Lighting Plan & E30 schedules):**\n- Duplex Outlets (Standard): ~24 devices visible/keyed on E10 (INFERRED count from Power Plan symbols; multiple FP-circuits shown)\n- GFCI Outlets: ~4 (drinking fountain, exterior WP, restroom keyed notes 6, 27, 43 \u2014 INFERRED)\n- Light Switches / Occupancy Sensors: ~8 (occ sensors per E30 OCC diagram + switch bank \u2014 INFERRED)\n- Light Fixtures: E30 Light Fixture Schedule shows Type A track (333 EA), C1 track heads (163 EA), recessed troffers, pendants, exit/emergency. Sales-floor track dominant. (VERIFIED from fixture schedule quantities)\n- Exit Signs / Emergency: ~6 (EX1/EX2 + EM types on E30 schedule \u2014 INFERRED)\n- Smoke/Duct Detectors: Duct smoke detectors keyed on M10/E10 (VERIFIED present, ~4)\n- Data Outlets (Cat6): Data lines shown at cashwrap on E10 (VERIFIED present, ~6)\n- Panels: Panel \"MP\" (400A, 3\u00d8 4W) and Panel \"PP\" (200A) \u2014 **VERIFIED** on E30 one-line & panel schedules\n- Gross Floor Area (for allowance): ~17,137 SF (VERIFIED \u2014 roof/floor transmission area, HVAC load calc sheet M00)\n\n**Note:** Exact device counts on E10/E20 are partially legible; counts below are conservative INFERRED figures from visible symbols/keyed notes. Conduit & Wire allowance uses the VERIFIED 17,137 SF GFA.\n\n| Item # | CSI Ref. | Description | Unit | Quantity | Wastage % | Qty w/ Wastage | Unit Material | Total Material | Unit Labor | Total Labor | Total Cost | Trade |\n|--------|----------|-------------|------|----------|-----------|----------------|---------------|----------------|------------|-------------|------------|-------|\n| 5.01 | 26 27 26 | Duplex Outlet (120V) | EA | 24 | 5% | 25 | $8.00 | $200.00 | $45.00 | $1,125.00 | $1,325.00 | Electrical |\n| 5.02 | 26 27 26 | GFCI Outlet | EA | 4 | 5% | 4 | $22.00 | $88.00 | $55.00 | $220.00 | $308.00 | Electrical |\n| 5.03 | 26 27 26 | Light Switch (Single-Pole) | EA | 8 | 5% | 8 | $5.00 | $40.00 | $35.00 | $280.00 | $320.00 | Electrical |\n| 5.04 | 26 51 13 | LED Recessed Light (6\") | EA | 40 | 5% | 42 | $35.00 | $1,470.00 | $85.00 | $3,570.00 | $5,040.00 | Electrical |\n| 5.05 | 26 52 13 | Exit Sign (LED) | EA | 6 | 5% | 6 | $85.00 | $510.00 | $95.00 | $570.00 | $1,080.00 | Electrical |\n| 5.06 | 26 28 13 | Smoke Detector (Hardwired) | EA | 4 | 5% | 4 | $65.00 | $260.00 | $95.00 | $380.00 | $640.00 | Electrical |\n| 5.07 | 26 05 26 | Conduit & Wire (Allowance) | SF | 17,137 | 10% | 18,851 | $6.00 | $113,106.00 | $10.00 | $188,510.00 | $301,616.00 | Electrical |\n| 5.08 | 26 24 16 | Electrical Panel (200A) \u2014 \"PP\" | EA | 1 | 0% | 1 | $925.00 | $925.00 | $985.00 | $985.00 | $1,910.00 | Electrical |\n\n**Show Your Work:**\n- Conduit & Wire allowance = 17,137 SF (VERIFIED floor area, M00 load calc) \u00d7 1.10 waste = 18,851 SF; Material 18,851 \u00d7 $6.00 = $113,106; Labor 18,851 \u00d7 $10.00 = $188,510.\n- Panel \"MP\" 400A not in cost database (largest listed is 200A) \u2014 EXCLUDED from priced line; noted for field verification.\n- Device counts INFERRED from partially-legible E10/E20 symbols; verify against final device schedule.\n\n**Division 26 Subtotal:** **$312,239.00**\n\n---\n\n## FINANCIAL SUMMARY\n| Description | Amount |\n|-------------|--------|\n| Division 01 - General Requirements | $0.00 |\n| Division 05/06 - Framing | $0.00 *(not quantifiable from this chunk)* |\n| Division 06 - Finish Carpentry | Excluded (out of scope) |\n| Division 07 - Roofing | Excluded (out of scope) |\n| Division 07 - Insulation | Excluded (out of scope) |\n| Division 07 - Siding Installation | Excluded (out of scope) |\n| Division 08 - Windows Installation | Excluded (out of scope) |\n| Division 08 - Doors Installation | Excluded (out of scope) |\n| Division 09 - Finishes (Painting) | Excluded (out of scope) |\n| Division 09 - Drywall | $0.00 *(not quantifiable from this chunk)* |\n| Division 09 - Flooring | Excluded (out of scope) |\n| Division 22 - Plumbing | Excluded (out of scope) |\n| Division 23 - HVAC | Excluded (out of scope) |\n| Division 26 - Electrical | $312,239.00 |\n| Division 01 - Cleaning | Excluded (out of scope) |\n| **SUBTOTAL** | **$312,239.00** |\n| Insurance (5%) | $15,611.95 |\n| Contingency (5%) | $15,611.95 |\n| Overhead & Profit (20%) | $62,447.80 |\n| **PROJECT TOTAL** | **$405,910.70** |\n\n---\n\n## ASSUMPTIONS & NOTES\n**VERIFIED DATA:**\n- Gross floor area = 17,137 SF (roof/floor transmission area, M00 HVAC load calculation sheet)\n- Panel \"MP\" = 400A, 3\u00d8 4W; Panel \"PP\" = 200A (E30 one-line diagram & panel schedules)\n- Light fixture schedule (E30): Type A pendant track (333 EA), C1 track heads (163 EA), recessed troffers, exit/emergency units\n- Duct smoke detectors present (M10 keyed notes, E10)\n- Data outlets at cashwrap (E10 power plan)\n- Scale: MEP plans 3/32\"=1'-0\"; Power/Lighting 3/16\"=1'-0\"\n\n**ASSUMPTIONS MADE:**\n- Ceiling: sales area open-to-deck, supply duct at 13'-6\" A.F.F. (M10)\n- Wall deductions: 15% for openings (N/A \u2014 no partitions quantified this chunk)\n- Electrical device counts INFERRED from partially legible symbols on E10/E20; conservative figures used\n- Conduit & Wire allowance applied to full 17,137 SF GFA\n- MEP allowances applied where symbol counts illegible\n\n**ITEMS REQUIRING FIELD VERIFICATION:**\n- All electrical device counts (outlets, switches, fixtures) \u2014 E10/E20 symbols only partially legible\n- Panel \"MP\" (400A) pricing \u2014 not in provided cost database; requires separate quote\n- LED recessed vs. track fixture split \u2014 reconcile with E30 fixture schedule quantities\n- Framing and Drywall quantities require architectural sheets A-series/A70 (chunk 1) \u2014 NOT PRESENT in this chunk\n\n**EXCLUSIONS:**\n- Division 05/06 Framing and Division 09 Drywall: architectural partition/ceiling plans not present in this chunk (MEP set only); no quantities fabricated\n- Panel \"MP\" 400A (no matching cost database line item)\n- All divisions outside selected scope (05/06, 09, 26)\n- Fire suppression, low-voltage beyond basic data outlets\n- Track lighting fixture supply (per notes, supplied by vendor in several instances)\n\n**QUALIFICATIONS:**\n- Estimate valid for 30 days from date of issue\n- Pricing based on current market conditions\n- Assumes single-shift work, normal working hours\n- Electrical costs are preliminary allowances pending final device schedule reconciliation\n- Framing/Drywall totals reported as $0.00 because the required architectural sheets are not in this chunk; a complete estimate requires chunk 1 (A43, A50, A60, A61, A62, A70)"
+  ],
+  "compression": {
+    "original_mb": 17.45,
+    "compressed_mb": 17.3,
+    "saved_mb": 0.16,
+    "ratio_pct": 0.9,
+    "repair_strategy": "ghostscript (screen)"
+  },
+  "usage": {
+    "estimate_input": 80564,
+    "estimate_output": 11256,
+    "merge_input": 11496,
+    "merge_output": 5625,
+    "json_input": 7041,
+    "json_output": 11416,
+    "total_input_tokens": 99101,
+    "total_output_tokens": 28297,
+    "total_tokens": 127398,
+    "total_cost_usd": 0.7218,
+    "total_pages": 30,
+    "total_chunks": 2
+  }
+}

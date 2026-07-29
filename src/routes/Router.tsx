@@ -43,6 +43,11 @@ import Company from '../pages/support/company';
 import Descriptive from '../pages/descriptive/descriptive-info';
 import UpdatePassword from '../pages/updatepassword/update-password';
 import PaymentSuccess from '../pages/payment-success/payment-success';
+import { AuthCallback } from '../pages/nylas/AuthCallback';
+import { Emails } from '../pages/emails/Emails';
+import { ReviewQueue } from '../pages/email-intelligence/ReviewQueue';
+import { TasksCalendar } from '../pages/email-intelligence/TasksCalendar';
+import AutomatedSequences from '../pages/automated-sequences';
 
 export function Router() {
   return (
@@ -65,6 +70,7 @@ export function Router() {
           <Route path="/subscribe" element={<SubscriptionPage />} />
         </Route>
         <Route path="/payment-success" element={<PaymentSuccess />} />
+        <Route path="/auth/nylas/callback" element={<AuthCallback />} />
 
 
         <Route element={<Layout />}>
@@ -80,6 +86,10 @@ export function Router() {
           <Route path="/estimates/ai" element={<AiEstimateList />} />
           <Route path="/estimates/ai/steps" element={<CreateProjectWizard />} />
           <Route path="/estimates/ai/file" element={<File />} />
+          <Route path="/emails" element={<Emails />} />
+          <Route path="/automated-sequences" element={<AutomatedSequences />} />
+          <Route path="/review-queue" element={<ReviewQueue />} />
+          <Route path="/tasks" element={<TasksCalendar />} />
 
           <Route path="/estimates" element={<InvoiceNavLayout />}>
             <Route index element={<EstimateCreated />} />

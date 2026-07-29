@@ -10,6 +10,14 @@ import { useDispatch, useSelector } from 'react-redux';
 import { clearAuth } from '../../redux/authSlice';
 import { useGetUserProfileQuery } from '../../services/rtkapi/invoiceApi';
 import { S3UploadService } from '../../components/data/s3-data';
+import { Badge } from '@mui/material';
+import NotificationsIcon from '@mui/icons-material/Notifications';
+import { createClient } from '@supabase/supabase-js';
+import { useNavigate } from 'react-router-dom';
+
+const supabaseUrl = import.meta.env.VITE_SUPABASE_URL || '';
+const supabaseAnonKey = import.meta.env.VITE_SUPABASE_ANON_KEY || '';
+const supabase = createClient(supabaseUrl, supabaseAnonKey);
 
 interface navbarProps {
   onMenuClick?: () => void;
@@ -20,6 +28,51 @@ export function Navbar({ onMenuClick, isWelcomePage }: navbarProps) {
   const { data, refetch } = useGetUserProfileQuery();
   const user = useSelector((state: { auth: { user: any } }) => state.auth.user);
   const [anchorEl, setAnchorEl] = useState<null | HTMLElement>(null);
+  const [pendingCount, setPendingCount] = useState(0);
+  const navigate = useNavigate();
+
+  useEffect(() => {
+    // Initial fetch of pending emails
+    const fetchPendingCount = async () => {
+      const { count } = await supabase
+        .from('review_queue')
+        .select('*', { count: 'exact', head: true })
+        .eq('status', 'pending');
+      
+      setPendingCount(count || 0);
+    };
+
+    fetchPendingCount();
+
+    // Subscribe to new emails in realtime
+    const subscription = supabase
+      .channel('public:review_queue')
+      .on(
+        'postgres_changes',
+        { event: 'INSERT', schema: 'public', table: 'review_queue' },
+        (payload) => {
+          if (payload.new && payload.new.status === 'pending') {
+            setPendingCount((prev) => prev + 1);
+          }
+        }
+      )
+      .on(
+        'postgres_changes',
+        { event: 'UPDATE', schema: 'public', table: 'review_queue' },
+        (payload) => {
+          if (payload.new && payload.new.status !== 'pending' && payload.old.status === 'pending') {
+            setPendingCount((prev) => Math.max(0, prev - 1));
+          } else if (payload.new && payload.new.status === 'pending' && payload.old.status !== 'pending') {
+            setPendingCount((prev) => prev + 1);
+          }
+        }
+      )
+      .subscribe();
+
+    return () => {
+      supabase.removeChannel(subscription);
+    };
+  }, []);
 
   useEffect(() => {
     if (user?.name) {
@@ -89,6 +142,16 @@ export function Navbar({ onMenuClick, isWelcomePage }: navbarProps) {
           >
             <UpgradeProfile />
           </Typography>
+
+          <IconButton 
+            onClick={() => navigate('/review-queue')} 
+            sx={{ ml: 2, mr: 1, color: 'gray' }}
+            title="Review Queue"
+          >
+            <Badge badgeContent={pendingCount} color="error" overlap="circular">
+              <NotificationsIcon />
+            </Badge>
+          </IconButton>
 
           {data?.data?.register?.name || user ? (
             <>

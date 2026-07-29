@@ -197,13 +197,34 @@ const EditMyProfileModal = ({ open, onClose, profileData, onSuccess }: EditMyPro
         body.avatar_url = finalAvatarPath;
       }
 
-      const profileId = profileData?.id || profileData?.user_id;
-      if (!profileId) {
+      let profileId = profileData?.id; // integer primary key
+      let profileUserId = profileData?.user_id; // UUID foreign key
+
+      const token = localStorage.getItem('access_token');
+      if (token) {
+        try {
+          const base64Url = token.split('.')[1];
+          const base64 = base64Url.replace(/-/g, '+').replace(/_/g, '/');
+          const jsonPayload = decodeURIComponent(atob(base64).split('').map(function(c) {
+              return '%' + ('00' + c.charCodeAt(0).toString(16)).slice(-2);
+          }).join(''));
+          const decoded: any = JSON.parse(jsonPayload);
+          if (!profileUserId) profileUserId = decoded.sub;
+        } catch (e) {
+          console.error("Failed to decode JWT to get user_id", e);
+        }
+      }
+
+      if (!profileId && !profileUserId) {
         toast.error('User profile ID not found.');
         return;
       }
+      
+      body.user_id = profileUserId;
+      if (profileId) body.id = profileId;
+      body.full_name = `${body.first_name} ${body.last_name}`.trim();
 
-      await updateUserProfile({ id: profileId, body }).unwrap();
+      await updateUserProfile({ body }).unwrap();
       toast.success('Profile updated successfully!');
       onSuccess();
       onClose();

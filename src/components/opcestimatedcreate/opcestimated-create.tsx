@@ -9,10 +9,13 @@ import PlanLimitModal from '../modal/plan-limit-modal';
 import { useAllEstimateQuery, useGetEstimatesQuery } from '../../services/rtkapi/invoiceApi';
 import { InvoiceModel } from '../../models/invoice';
 import FormInvoiceEstimate from '../../components/forminvoiceestimate/formin-voicestimate';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useSearchParams } from 'react-router-dom';
+import EstimateFollowupsList from './estimate-followups-list';
 
 const OptionEstimateCreated = () => {
-  const [selectedTab, setSelectedTab] = useState<number>(0);
+  const [searchParams, setSearchParams] = useSearchParams();
+  const initialTab = searchParams.get('tab') === 'automated-sequences' ? 1 : 0;
+  const [selectedTab, setSelectedTab] = useState<number>(initialTab);
   const [page, setPage] = useState<number>(1);
   const itemsPerPage = 9;
   const [search, setSearch] = useState<string>('');
@@ -81,6 +84,10 @@ const OptionEstimateCreated = () => {
   }
 
   const renderTabContent = () => {
+    if (selectedTab === 1) {
+      return <EstimateFollowupsList />;
+    }
+
     if (!search && totalEstimations === 0 && !isLoading) {
       return (
         <div className="text-center w-full">
@@ -181,7 +188,14 @@ const OptionEstimateCreated = () => {
           <div className="flex-1">
             <Tabs
               value={selectedTab}
-              onChange={(_, newValue) => setSelectedTab(newValue)}
+              onChange={(_, newValue) => {
+                setSelectedTab(newValue);
+                if (newValue === 1) {
+                  setSearchParams({ tab: 'automated-sequences' });
+                } else {
+                  setSearchParams({});
+                }
+              }}
               variant="scrollable"
               scrollButtons="auto"
               allowScrollButtonsMobile
@@ -198,6 +212,14 @@ const OptionEstimateCreated = () => {
                   </div>
                 }
                 className="!text-[#448AFF]"
+                sx={{
+                  padding: { xs: '6px 10px', sm: '6px 14px' },
+                  minWidth: 'auto',
+                }}
+              />
+              <Tab
+                label="Automated Sequences"
+                className="!text-gray-500 hover:!text-[#448AFF]"
                 sx={{
                   padding: { xs: '6px 10px', sm: '6px 14px' },
                   minWidth: 'auto',

@@ -55,5 +55,5 @@ export const createAPI = createApi({
   reducerPath: 'api',
   baseQuery: baseQueryWithReauth,
   endpoints: () => ({}),
-  tagTypes: ['Client', 'Product', 'Invoice', 'Estimate', 'Update-estimate', 'Company', 'LegalInfo', 'AiEstimate', 'AiEstimateResults', 'Tax', 'Discount', 'AiChatHistory'],
+  tagTypes: ['Client', 'Product', 'Invoice', 'Estimate', 'Update-estimate', 'Company', 'LegalInfo', 'AiEstimate', 'AiEstimateResults', 'Tax', 'Discount', 'AiChatHistory', 'Followup'],
 });

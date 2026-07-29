@@ -199,12 +199,14 @@ const EstimateTemplateModal: React.FC<EstimateTemplateModalProps> = ({
       const s3Path = await S3UploadService.uploadFileInChunks(pdfFile, undefined, 'paybue-invoice-estimation/estimates');
       const publicUrl = S3UploadService.getPublicUrl(s3Path, 'paybue-invoice-estimation/estimates');
 
-      // 3. Update Estimate document_url
+      // 3. Update Estimate document_url and nylas_grant_id
       await updateEstimate({
         estimate_id: estimateId,
         body: { 
           document_url: publicUrl,
-          template_number: selectedTemplate
+          template_number: selectedTemplate,
+          nylas_grant_id: localStorage.getItem("nylas_grant_id"),
+          status: 'sent'
         }
       }).unwrap();
 

@@ -6,3 +6,25 @@ verify_jwt = false
 
 [functions.user-api]
 verify_jwt = false
+
+[functions.debug-nylas]
+enabled = true
+verify_jwt = false
+import_map = "./functions/debug-nylas/deno.json"
+# Uncomment to specify a custom file path to the entrypoint.
+# Supported file extensions are: .ts, .js, .mjs, .jsx, .tsx
+entrypoint = "./functions/debug-nylas/index.ts"
+# Specifies static files to be bundled with the function. Supports glob patterns.
+# For example, if you want to serve static HTML pages in your function:
+# static_files = [ "./functions/debug-nylas/*.html" ]
+
+[functions.process-estimate-followups]
+enabled = true
+verify_jwt = false
+import_map = "./functions/process-estimate-followups/deno.json"
+# Uncomment to specify a custom file path to the entrypoint.
+# Supported file extensions are: .ts, .js, .mjs, .jsx, .tsx
+entrypoint = "./functions/process-estimate-followups/index.ts"
+# Specifies static files to be bundled with the function. Supports glob patterns.
+# For example, if you want to serve static HTML pages in your function:
+# static_files = [ "./functions/process-estimate-followups/*.html" ]

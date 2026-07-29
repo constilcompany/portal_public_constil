@@ -4,10 +4,12 @@
 /* eslint-disable @typescript-eslint/ban-ts-comment */
 
 import { useEffect, useRef, useState } from 'react';
+import { createPortal } from 'react-dom';
 import { useDispatch, useSelector } from 'react-redux';
 import { RootState } from '../../redux/store';
 import jsPDF from 'jspdf';
 import autoTable from 'jspdf-autotable';
+import { createClient } from '@supabase/supabase-js';
 import {
   ArrowLeft,
   Check,
@@ -33,18 +35,14 @@ import {
   invoiceApi
 } from '../../services/rtkapi/invoiceApi';
 import { toast } from 'react-toastify';
+import { nylasService } from '../../services/nylasService';
 import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
 import 'jspdf/dist/polyfills.es.js';
 // @ts-ignore
 import 'jspdf/dist/jspdf.es.min.js';
 import { useNavigate } from 'react-router-dom';
-import { createClient } from '@supabase/supabase-js';
 
-const supabase = createClient(
-  import.meta.env.VITE_SUPABASE_URL,
-  import.meta.env.VITE_SUPABASE_ANON_KEY
-);
 
 type XlsxLib = typeof import('xlsx-js-style');
 
@@ -102,7 +100,32 @@ const getTableSubtotal = (table: TableData) => {
     ['total cost', 'total', 'amount'].includes(h.toLowerCase()),
   );
   if (!costKey) return 0;
+
+  // First, see if there's an explicit "PROJECT TOTAL" or "GRAND TOTAL" row
+  for (const r of table.rows) {
+    for (const key of Object.keys(r)) {
+      if (key === costKey) continue;
+      const val = String(r[key]).toLowerCase().trim();
+      if (val === 'project total' || val === 'grand total' || val === 'total') {
+        const c = r[costKey]?.toString().replace(/[$,]/g, '') || '0';
+        return parseFloat(c) || 0;
+      }
+    }
+  }
+
+  // Otherwise, sum the rows but exclude subtotal/total rows to avoid double-counting
   return table.rows.reduce((sum, r) => {
+    let isSummaryRow = false;
+    for (const key of Object.keys(r)) {
+      if (key === costKey) continue;
+      const val = String(r[key]).toLowerCase().trim();
+      if (val === 'subtotal' || val === 'total' || val.includes('project total') || val.includes('grand total')) {
+        isSummaryRow = true;
+        break;
+      }
+    }
+    if (isSummaryRow) return sum;
+    
     const c = r[costKey]?.toString().replace(/[$,]/g, '') || '0';
     return sum + (parseFloat(c) || 0);
   }, 0);
@@ -232,6 +255,8 @@ const File = () => {
   const [aiTableData] = useAiTableDataMutation();
   const estimate = useSelector((state: RootState) => state.estimate.tables as any);
   const estimateId = estimate?.id || (Array.isArray(estimate) ? estimate[0]?.id : null);
+  const authToken = useSelector((state: RootState) => state.auth?.token);
+  const authUser = useSelector((state: RootState) => state.auth?.user);
 
   // Fetch results from DB if they aren't already in the Redux state
   const { data: dbResults, isLoading: dbLoading, refetch: refetchDbResults } = invoiceApi.useGetAiEstimateResultsQuery(
@@ -357,6 +382,12 @@ const File = () => {
 
   const [isGeneratingProposal, setIsGeneratingProposal] = useState(false);
   const [proposalPricingText, setProposalPricingText] = useState('');
+  const [proposalCoverCompany, setProposalCoverCompany] = useState('CONSTIL');
+  const [proposalCoverType, setProposalCoverType] = useState('PROPOSAL');
+  const [proposalCoverSubtitle, setProposalCoverSubtitle] = useState('Professional Takeoff Document');
+  const [proposalCoverBadge, setProposalCoverBadge] = useState('Official Proposal');
+  const [proposalCoverTitle, setProposalCoverTitle] = useState('Construction Takeoff & Budget Estimate');
+  const [proposalCoverDescription, setProposalCoverDescription] = useState('Detailed material quantification, pricing breakdown, and execution scope details.');
   const [logoUrl, setLogoUrl] = useState<string | null>(null);
   const [contractorSignatureUrl, setContractorSignatureUrl] = useState<string | null>(null);
   const [clientSignatureUrl, setClientSignatureUrl] = useState<string | null>(null);
@@ -612,40 +643,75 @@ const File = () => {
     };
 
     // PAGE 1: COVER PAGE
+    let startX = margin;
+    
     // Draw Logo if uploaded
     if (logoUrl) {
       try {
-        doc.addImage(logoUrl, 'PNG', margin, 25, 45, 15);
+        const logoWidth = 45;
+        doc.addImage(logoUrl, 'PNG', margin, 22, logoWidth, 15);
+        startX = margin + logoWidth + 5; // offset for text
       } catch (err) {
         console.error("Error drawing logo in PDF:", err);
       }
-    } else {
-      // Draw a default text logo
-      doc.setFont("Times", "bold");
-      doc.setFontSize(18);
-      doc.setTextColor(68, 138, 255); // #448AFF
-      doc.text("CONSTIL", margin, 32);
-      doc.setFontSize(12);
-      doc.setTextColor(100, 100, 100);
-      doc.text("Takeoffs & Estimation", margin, 37);
     }
 
+    // Draw the company text and type next to it (or in place of it)
+    doc.setFont("Times", "bold");
+    doc.setFontSize(18);
+    doc.setTextColor(30, 41, 59); // slate-900
+    const companyText = proposalCoverCompany || "CONSTIL";
+    doc.text(companyText.toUpperCase(), startX, 31);
+    
+    const companyWidth = doc.getTextWidth(companyText.toUpperCase());
+    
+    doc.setFont("Times", "normal");
+    doc.setTextColor(68, 138, 255); // #448AFF
+    const typeText = proposalCoverType || "PROPOSAL";
+    doc.text(typeText.toUpperCase(), startX + companyWidth + 2, 31);
+    
+    doc.setFontSize(10);
+    doc.setTextColor(148, 163, 184); // slate-400
+    const subtitleTextHeader = proposalCoverSubtitle || "Professional Takeoff Document";
+    doc.text(subtitleTextHeader.toUpperCase(), startX, 36);
+
+    // Badge
+    const badgeText = proposalCoverBadge || "Official Proposal";
+    doc.setFont("Times", "bold");
+    doc.setFontSize(10);
+    doc.setTextColor(71, 85, 105); // slate-600
+    const badgeWidth = doc.getTextWidth(badgeText.toUpperCase());
+    doc.text(badgeText.toUpperCase(), (pageWidth - badgeWidth) / 2, 60);
+
+    // Title
     doc.setFont("Times", "bold");
     doc.setFontSize(28);
     doc.setTextColor(30, 41, 59); // Slate-800
-    doc.text("CONSTRUCTION PROPOSAL", margin, 70);
-    doc.text("& BUDGET ESTIMATE", margin, 82);
+    const titleText = proposalCoverTitle || "Construction Takeoff & Budget Estimate";
+    const splitTitle = doc.splitTextToSize(titleText, contentWidth);
+    let titleY = 75;
+    splitTitle.forEach((line: string) => {
+      const lineWidth = doc.getTextWidth(line);
+      doc.text(line, (pageWidth - lineWidth) / 2, titleY);
+      titleY += 12;
+    });
 
     doc.setDrawColor(68, 138, 255); // #448AFF
     doc.setLineWidth(2);
-    doc.line(margin, 90, 80, 90);
+    doc.line((pageWidth - 80) / 2, titleY - 2, (pageWidth + 80) / 2, titleY - 2);
 
     doc.setFont("Times", "normal");
     doc.setFontSize(12);
     doc.setTextColor(100, 116, 139); // Slate-500
-    const subtitleText = "Detailed material quantification, pricing breakdown, and execution scope details.";
-    const splitSubtitle = doc.splitTextToSize(subtitleText, contentWidth);
-    doc.text(splitSubtitle, margin, 100, { lineHeightFactor: 1.5 });
+    const descText = proposalCoverDescription || "Detailed material quantification, pricing breakdown, and execution scope details.";
+    const splitDesc = doc.splitTextToSize(descText, contentWidth);
+    
+    let descY = titleY + 10;
+    splitDesc.forEach((line: string) => {
+      const lineWidth = doc.getTextWidth(line);
+      doc.text(line, (pageWidth - lineWidth) / 2, descY);
+      descY += 6;
+    });
 
     // Draw Metadata box
     const tableData = [
@@ -974,20 +1040,107 @@ ${proposalPricingText}
         throw new Error(`HTTP error! status: ${response.status}`);
       }
 
-      // @ts-ignore
-      const { data, error } = await supabase.functions.invoke('send-email', {
-        body: { toEmail: customerEmail.trim() },
-        headers: {
-          // @ts-ignore
-          'apikey': supabase.supabaseKey || supabase.auth.session?.()?.access_token,
-          // @ts-ignore
-          'Authorization': `Bearer ${supabase.supabaseKey}`
-        }
-      });
+      // Generate PDF for sending
+      const doc = generateProposalPDF();
+      const pdfBase64 = doc.output('datauristring').split(',')[1];
 
-      if (error) {
-        console.error("[SENDGRID ERROR] Secure edge function response:", error);
-        throw new Error(error.message || "Failed to send email");
+      // Send using Nylas Service
+      const nylasGrantId = localStorage.getItem('nylas_grant_id');
+      if (!nylasGrantId) {
+        throw new Error("No connected email found. Please connect your email first.");
+      }
+
+      // Automatically track this AI estimate in the Automated Sequences
+      try {
+        const supabaseUrl = import.meta.env.VITE_SUPABASE_URL || '';
+        const supabaseAnonKey = import.meta.env.VITE_SUPABASE_ANON_KEY || '';
+        const token = authToken || localStorage.getItem('access_token');
+        const userId = authUser?.id || localStorage.getItem('user_id');
+
+        if (userId && token) {
+          // 0. Get or Create a Client for this email
+          let clientId = null;
+          try {
+            const clientRes = await fetch(`${supabaseUrl}/rest/v1/clients?email=eq.${encodeURIComponent(customerEmail.trim())}&select=id`, {
+              headers: { 'apikey': supabaseAnonKey, 'Authorization': `Bearer ${token}` }
+            });
+            if (clientRes.ok) {
+              const clients = await clientRes.json();
+              if (clients && clients.length > 0) {
+                clientId = clients[0].id;
+              }
+            }
+            if (!clientId) {
+              const createClientRes = await fetch(`${supabaseUrl}/rest/v1/clients`, {
+                method: 'POST',
+                headers: {
+                  'Content-Type': 'application/json',
+                  'apikey': supabaseAnonKey,
+                  'Authorization': `Bearer ${token}`,
+                  'Prefer': 'return=representation'
+                },
+                body: JSON.stringify({
+                  user_id: userId,
+                  email: customerEmail.trim(),
+                  name: customerEmail.trim().split('@')[0],
+                })
+              });
+              if (createClientRes.ok) {
+                const newClient = await createClientRes.json();
+                clientId = newClient[0]?.id;
+              }
+            }
+          } catch (clientErr) {
+            console.error("Failed fetching/creating client:", clientErr);
+          }
+
+          // 1. Create dummy estimate to satisfy foreign keys and hold the total_amount
+          const estimateRes = await fetch(`${supabaseUrl}/rest/v1/estimates`, {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+              'apikey': supabaseAnonKey,
+              'Authorization': `Bearer ${token}`,
+              'Prefer': 'return=representation'
+            },
+            body: JSON.stringify({
+              user_id: userId,
+              client_id: clientId || undefined,
+              status: 'sent',
+              total: proposalPricingTotal,
+              total_amount: proposalPricingTotal,
+              estimate_number: 'AI-' + Math.floor(1000 + Math.random() * 9000).toString(),
+              estimate_date: new Date().toISOString(),
+              nylas_grant_id: nylasGrantId
+            })
+          });
+
+          if (estimateRes.ok) {
+            console.log("Dummy estimate created successfully, trigger should handle followups!");
+          } else {
+            const dummyErr = await estimateRes.text();
+            console.error("Failed to create dummy estimate:", dummyErr);
+          }
+        } else {
+          console.error("Could not find userId or token to create tracking sequence");
+        }
+      } catch (seqErr) {
+        console.error("Failed to setup automated sequence for AI estimate via REST:", seqErr);
+      }
+
+      const emailBodyText = `# CONSTRUCTION PROPOSAL & BUDGET ESTIMATE ##\n\nPlease find your detailed proposal and estimate attached as a PDF.`;
+
+      const { success, message } = await nylasService.sendEmail(
+        nylasGrantId,
+        customerEmail.trim(),
+        "Your Construction Proposal & Estimate",
+        emailBodyText,
+        pdfBase64,
+        "Proposal.pdf"
+      );
+
+      if (!success) {
+        throw new Error(message || "Failed to send email via Nylas");
       }
 
       toast.dismiss(loadingToast);
@@ -1003,7 +1156,14 @@ ${proposalPricingText}
     } catch (err: any) {
       console.error("[SEND QUOTE] Error:", err);
       toast.dismiss(loadingToast);
-      toast.error(err.message || "Failed to email quote. Please try again.");
+      
+      const errorMessage = err.message || "";
+      if (errorMessage === "Unauthorized" || errorMessage.includes("401") || errorMessage.includes("grant")) {
+        localStorage.removeItem('nylas_grant_id');
+        toast.error("Your email connection has expired or is invalid. Please go to the Emails tab to reconnect your account.");
+      } else {
+        toast.error(errorMessage || "Failed to email quote. Please try again.");
+      }
     } finally {
       setIsSendingEmail(false);
     }
@@ -2138,11 +2298,31 @@ ${proposalPricingText}
                             </div>
                           )}
                           <div>
-                            <h3 className="text-xl font-black text-slate-900 tracking-tight flex items-center gap-1.5">
+                            <div className="flex items-center gap-1.5 mb-1">
                               <Sparkles className="w-5 h-5 text-primary animate-pulse" />
-                              CONSTIL <span className="text-primary font-light">PROPOSAL</span>
-                            </h3>
-                            <p className="text-[9px] text-slate-400 uppercase tracking-widest mt-0.5">Professional Takeoff Document</p>
+                              <div className="flex items-center text-xl font-black text-slate-900 tracking-tight">
+                                <input
+                                  type="text"
+                                  value={proposalCoverCompany}
+                                  onChange={(e) => setProposalCoverCompany(e.target.value)}
+                                  style={{ width: `${Math.max(proposalCoverCompany.length, 1) + 1}ch` }}
+                                  className="bg-transparent border border-transparent hover:bg-slate-50 focus:border-primary rounded outline-none px-1 uppercase"
+                                />
+                                <input
+                                  type="text"
+                                  value={proposalCoverType}
+                                  onChange={(e) => setProposalCoverType(e.target.value)}
+                                  style={{ width: `${Math.max(proposalCoverType.length, 1) + 1}ch` }}
+                                  className="text-primary font-light bg-transparent border border-transparent hover:bg-slate-50 focus:border-primary rounded outline-none px-1 uppercase"
+                                />
+                              </div>
+                            </div>
+                            <input
+                              type="text"
+                              value={proposalCoverSubtitle}
+                              onChange={(e) => setProposalCoverSubtitle(e.target.value)}
+                              className="text-[9px] text-slate-400 uppercase tracking-widest bg-transparent border border-transparent hover:bg-slate-50 focus:border-primary rounded outline-none w-full px-1 py-0.5 block"
+                            />
                           </div>
                         </div>
                         <div className="flex flex-col items-end gap-1.5">
@@ -2170,16 +2350,26 @@ ${proposalPricingText}
                       </div>
 
                       {/* Main Cover Title Block */}
-                      <div className="my-12 text-center space-y-6">
-                        <div className="inline-block px-3 py-1 bg-slate-100 text-slate-600 text-[10px] font-bold rounded-full uppercase tracking-wider">
-                          Official Proposal
-                        </div>
-                        <h1 className="text-3xl font-extrabold text-slate-900 tracking-tight leading-tight">
-                          Construction Takeoff &amp; Budget Estimate
-                        </h1>
-                        <p className="text-sm text-slate-500 max-w-md mx-auto">
-                          Detailed material quantification, pricing breakdown, and execution scope details.
-                        </p>
+                      <div className="my-12 text-center flex flex-col items-center gap-6">
+                        <input
+                          type="text"
+                          value={proposalCoverBadge}
+                          onChange={(e) => setProposalCoverBadge(e.target.value)}
+                          style={{ width: `${Math.max(proposalCoverBadge.length, 10) + 4}ch` }}
+                          className="inline-block px-3 py-1 bg-slate-100 text-slate-600 text-[10px] font-bold rounded-full uppercase tracking-wider text-center outline-none border border-transparent hover:border-slate-300 focus:border-primary transition-colors max-w-full"
+                        />
+                        <textarea
+                          value={proposalCoverTitle}
+                          onChange={(e) => setProposalCoverTitle(e.target.value)}
+                          className="text-3xl font-extrabold text-slate-900 tracking-tight leading-tight text-center bg-transparent border border-transparent hover:border-slate-200 focus:border-primary rounded-lg outline-none w-full max-w-2xl px-2 py-1 resize-none overflow-hidden"
+                          rows={2}
+                        />
+                        <textarea
+                          value={proposalCoverDescription}
+                          onChange={(e) => setProposalCoverDescription(e.target.value)}
+                          className="text-sm text-slate-500 w-full max-w-md mx-auto text-center bg-transparent border border-transparent hover:border-slate-200 focus:border-primary rounded-lg outline-none px-2 py-1 resize-none overflow-hidden"
+                          rows={3}
+                        />
                       </div>
 
                       {/* Metadata Grid (Editable Inputs) */}
@@ -2603,23 +2793,40 @@ ${proposalPricingText}
 
             {/* Modal Body */}
             <div className="p-6">
-              <div className="space-y-4">
-                <div>
-                  <label htmlFor="customer-email-input" className="block text-xs font-semibold text-gray-500 uppercase tracking-wider mb-2">
-                    Customer Email Address
-                  </label>
-                  <input
-                    id="customer-email-input"
-                    type="email"
-                    required
-                    value={customerEmail}
-                    onChange={(e) => setCustomerEmail(e.target.value)}
-                    placeholder="e.g. customer@example.com"
-                    className="w-full px-4 py-3 border border-gray-200 rounded-xl text-sm focus:border-primary focus:ring-2 focus:ring-primary/20 outline-none"
-                    disabled={isSendingEmail}
-                  />
+              {!localStorage.getItem('nylas_grant_id') ? (
+                <div className="text-center space-y-4 py-4">
+                  <div className="mx-auto w-12 h-12 bg-primary/10 text-primary rounded-full flex items-center justify-center mb-4">
+                    <Mail className="w-6 h-6" />
+                  </div>
+                  <h4 className="text-lg font-bold text-gray-900">Connect Your Email</h4>
+                  <p className="text-sm text-gray-500 max-w-sm mx-auto">
+                    To send estimates directly to your customers, please connect your Gmail or Outlook account.
+                  </p>
+                  <button
+                    onClick={() => nylasService.connectEmail()}
+                    className="mt-6 px-6 py-3 bg-primary hover:bg-[#3d7ef7] text-white rounded-xl text-sm font-semibold shadow-md transition-all flex items-center gap-2 mx-auto cursor-pointer"
+                  >
+                    <Mail className="w-4 h-4" />
+                    Connect Email Account
+                  </button>
                 </div>
-              </div>
+              ) : (
+                <div className="space-y-4">
+                  <div>
+                    <label htmlFor="customer-email-input" className="block text-xs font-semibold text-gray-500 uppercase tracking-wider mb-2">
+                      Customer Email Address
+                    </label>
+                    <EmailCombobox
+                      id="customer-email-input"
+                      value={customerEmail}
+                      onChange={(e: any) => setCustomerEmail(e.target.value)}
+                      placeholder="e.g. customer@example.com"
+                      className="w-full px-4 py-3 border border-gray-200 rounded-xl text-sm focus:border-primary focus:ring-2 focus:ring-primary/20 outline-none"
+                      disabled={isSendingEmail}
+                    />
+                  </div>
+                </div>
+              )}
             </div>
 
             {/* Modal Footer */}
@@ -2631,23 +2838,25 @@ ${proposalPricingText}
               >
                 Cancel
               </button>
-              <button
-                onClick={handleSendQuote}
-                disabled={isSendingEmail || !customerEmail.trim()}
-                className="px-5 py-2.5 bg-primary hover:bg-[#3d7ef7] text-white rounded-xl text-sm font-semibold shadow-md active:scale-95 transition-all flex items-center gap-1.5 disabled:opacity-55 disabled:cursor-not-allowed cursor-pointer"
-              >
-                {isSendingEmail ? (
-                  <>
-                    <Loader2 className="w-4 h-4 animate-spin" />
-                    Sending…
-                  </>
-                ) : (
-                  <>
-                    <Send className="w-4 h-4" />
-                    Send
-                  </>
-                )}
-              </button>
+              {localStorage.getItem('nylas_grant_id') && (
+                <button
+                  onClick={handleSendQuote}
+                  disabled={isSendingEmail || !customerEmail.trim()}
+                  className="px-5 py-2.5 bg-primary hover:bg-[#3d7ef7] text-white rounded-xl text-sm font-semibold shadow-md active:scale-95 transition-all flex items-center gap-1.5 disabled:opacity-55 disabled:cursor-not-allowed cursor-pointer"
+                >
+                  {isSendingEmail ? (
+                    <>
+                      <Loader2 className="w-4 h-4 animate-spin" />
+                      Sending…
+                    </>
+                  ) : (
+                    <>
+                      <Send className="w-4 h-4" />
+                      Send
+                    </>
+                  )}
+                </button>
+              )}
             </div>
           </div>
         </div>
@@ -2702,12 +2911,10 @@ ${proposalPricingText}
                     Customer Email Address
                   </label>
                   <div className="relative">
-                    <input
+                    <EmailCombobox
                       id="preview-customer-email"
-                      type="email"
-                      required
                       value={customerEmail}
-                      onChange={(e) => setCustomerEmail(e.target.value)}
+                      onChange={(e: any) => setCustomerEmail(e.target.value)}
                       placeholder="e.g. customer@example.com"
                       disabled={isSendingEmail}
                       className="w-full pl-10 pr-4 py-3 border border-slate-200 rounded-xl text-sm focus:border-primary focus:ring-2 focus:ring-primary/20 outline-none transition-all"
@@ -2749,6 +2956,125 @@ ${proposalPricingText}
         </div>
       )}
     </section>
+  );
+};
+
+const EmailCombobox = ({ value, onChange, disabled, id, placeholder, className }: any) => {
+  const [suggestedContacts, setSuggestedContacts] = useState<{name: string, email: string}[]>([]);
+  const [showSuggestions, setShowSuggestions] = useState(false);
+  const inputRef = useRef<HTMLInputElement>(null);
+  const dropdownRef = useRef<HTMLDivElement>(null);
+  const [rect, setRect] = useState<DOMRect | null>(null);
+
+  useEffect(() => {
+    const fetchContacts = async () => {
+      const grantId = localStorage.getItem('nylas_grant_id');
+      if (!grantId) return;
+      try {
+        const [inbox, sent] = await Promise.all([
+          nylasService.getEmails(grantId, 'INBOX', 50).catch(e => { console.error(e); return []; }),
+          nylasService.getEmails(grantId, 'SENT', 50).catch(e => { console.error(e); return []; })
+        ]);
+        const emails = [...inbox, ...sent];
+        const contactMap = new Map<string, string>();
+        emails.forEach((msg: any) => {
+          [...(msg.to || []), ...(msg.cc || []), ...(msg.from || [])].forEach((contact: any) => {
+            if (contact && contact.email && contact.email.includes('@')) {
+               contactMap.set(contact.email, contact.name || contact.email.split('@')[0]);
+            }
+          });
+        });
+        const contactsArray = Array.from(contactMap.entries()).map(([email, name]) => ({ email, name }));
+        setSuggestedContacts(contactsArray);
+      } catch (e) {
+        console.error("Failed to fetch contacts", e);
+      }
+    };
+    fetchContacts();
+  }, []);
+
+  const updateRect = () => {
+    if (inputRef.current && showSuggestions) {
+      setRect(inputRef.current.getBoundingClientRect());
+    }
+  };
+
+  useEffect(() => {
+    updateRect();
+    window.addEventListener('resize', updateRect);
+    window.addEventListener('scroll', updateRect, true);
+    return () => {
+      window.removeEventListener('resize', updateRect);
+      window.removeEventListener('scroll', updateRect, true);
+    };
+  }, [showSuggestions]);
+
+  useEffect(() => {
+    const handleClickOutside = (event: MouseEvent) => {
+      if (
+        inputRef.current && !inputRef.current.contains(event.target as Node) &&
+        dropdownRef.current && !dropdownRef.current.contains(event.target as Node)
+      ) {
+        setShowSuggestions(false);
+      }
+    };
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => document.removeEventListener('mousedown', handleClickOutside);
+  }, []);
+
+  const filteredContacts = suggestedContacts.filter(c => 
+    c.email.toLowerCase().includes((value || '').toLowerCase()) || 
+    c.name.toLowerCase().includes((value || '').toLowerCase())
+  );
+
+  return (
+    <>
+      <input
+        ref={inputRef}
+        id={id}
+        type="text"
+        value={value}
+        onChange={onChange}
+        onFocus={() => setShowSuggestions(true)}
+        placeholder={placeholder}
+        className={className}
+        disabled={disabled}
+        autoComplete="off"
+        spellCheck="false"
+      />
+      {showSuggestions && filteredContacts.length > 0 && rect && createPortal(
+        <div 
+          ref={dropdownRef}
+          className="fixed z-[9999] bg-white border border-slate-200 rounded-xl shadow-xl max-h-60 overflow-y-auto flex flex-col py-1.5 animate-in fade-in zoom-in-95 duration-100"
+          style={{
+            top: rect.bottom + 4,
+            left: rect.left,
+            width: rect.width
+          }}
+        >
+          {filteredContacts.map((contact, idx) => (
+            <div
+              key={idx}
+              className="px-4 py-3 hover:bg-slate-50 cursor-pointer flex items-center gap-3 transition-colors border-b border-slate-50 last:border-0"
+              onMouseDown={(e) => {
+                e.preventDefault();
+                onChange({ target: { value: contact.email } });
+                setShowSuggestions(false);
+              }}
+            >
+              <div className="w-8 h-8 rounded-full bg-blue-50 flex items-center justify-center text-blue-600 font-bold text-xs shrink-0 shadow-sm border border-blue-100">
+                {(contact.name || contact.email).substring(0, 1).toUpperCase()}
+              </div>
+              <div className="flex flex-col min-w-0">
+                <span className="text-sm font-bold text-slate-800 truncate">{contact.name || contact.email.split('@')[0]}</span>
+                <span className="text-[11px] font-medium text-slate-500 truncate">{contact.email}</span>
+              </div>
+            </div>
+          ))}
+        </div>,
+        document.body
+      )}
+    </>
   );
 };
 

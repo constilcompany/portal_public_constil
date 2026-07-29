@@ -1,6 +1,6 @@
 import { useNavigate, useLocation } from "react-router-dom";
 import type { ComponentType, SVGProps } from "react";
-import { Headphones, Sparkles } from "lucide-react";
+import { Headphones, Sparkles, Mail, Calendar, Workflow } from "lucide-react";
 import IconHome from "../../assets/icons/homeIcone";
 import InvoiceIcone from "../../assets/icons/invoiceicone";
 import IconEstimates from "../../assets/icons/iconestimates";
@@ -21,6 +21,10 @@ const MAIN_MENU: MenuItem[] = [
   { path: "/invoices", label: "Invoices", icon: InvoiceIcone },
   { path: "/estimates", label: "Estimates", icon: IconEstimates },
   { path: "/estimates/ai", label: "Estimates AI", icon: Sparkles },
+  { path: "/emails", label: "Emails", icon: Mail },
+  { path: "/automated-sequences", label: "Automated Sequences", icon: Workflow },
+  { path: "/review-queue", label: "Review Queue", icon: Sparkles },
+  { path: "/tasks", label: "Tasks & Calendar", icon: Calendar },
   { path: "/clients", label: "Clients", icon: UserEdition },
   { path: "/products", label: "Products", icon: IconProduto },
   { path: "/user/myprofile", label: "Settings", icon: SettingIcon },
