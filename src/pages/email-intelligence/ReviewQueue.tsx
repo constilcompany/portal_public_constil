@@ -201,15 +201,15 @@ export function ReviewQueue() {
   };
 
   return (
-    <div className="flex h-screen bg-gray-50 text-gray-800">
+    <div className="flex flex-col md:flex-row h-screen bg-gray-50 text-gray-800">
       {/* Left Sidebar: Queue List */}
-      <div className="w-1/3 bg-white border-r border-gray-200 overflow-y-auto">
-        <div className="p-4 border-b border-gray-200 bg-gray-50 flex items-center justify-between sticky top-0">
+      <div className="w-full md:w-1/3 h-1/3 md:h-auto bg-white border-b md:border-b-0 md:border-r border-gray-200 overflow-y-auto">
+        <div className="p-4 border-b border-gray-200 bg-gray-50 flex flex-wrap items-center justify-between sticky top-0 z-10">
           <h2 className="text-lg font-semibold flex items-center gap-2">
             <LayoutTemplate className="w-5 h-5 text-blue-600" />
             Review Queue
           </h2>
-          <div className="flex items-center gap-2">
+          <div className="flex items-center gap-2 mt-2 sm:mt-0">
             <button 
               onClick={handleManualSync}
               disabled={loading}
@@ -260,35 +260,36 @@ export function ReviewQueue() {
       </div>
 
       {/* Right Side: Detail & Edit View */}
-      <div className="w-2/3 flex flex-col h-screen overflow-hidden bg-gray-50">
+      <div className="w-full md:w-2/3 flex flex-col h-2/3 md:h-screen overflow-hidden bg-gray-50">
         {selectedItem ? (
           <>
             {/* Action Bar */}
-            <div className="bg-white border-b border-gray-200 px-6 py-4 flex justify-between items-center shadow-sm z-10">
-              <h2 className="text-xl font-bold text-gray-800">Validate AI Extraction</h2>
-              <div className="flex gap-3">
+            <div className="bg-white border-b border-gray-200 px-4 md:px-6 py-4 flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 sm:gap-0 shadow-sm z-10">
+              <h2 className="text-lg md:text-xl font-bold text-gray-800">Validate AI Extraction</h2>
+              <div className="flex gap-2 md:gap-3 w-full sm:w-auto">
                 <button 
                   onClick={handleReject} 
                   disabled={submitting}
-                  className="px-4 py-2 bg-white border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50 font-medium flex items-center gap-2 transition-colors disabled:opacity-50"
+                  className="px-3 md:px-4 py-2 bg-white border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50 font-medium flex items-center justify-center gap-2 transition-colors disabled:opacity-50 flex-1 sm:flex-none text-sm md:text-base"
                 >
                   <X className="w-4 h-4" /> Reject
                 </button>
                 <button 
                   onClick={handleApprove} 
                   disabled={submitting}
-                  className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 font-medium flex items-center gap-2 transition-colors shadow-sm disabled:opacity-50"
+                  className="px-3 md:px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 font-medium flex items-center justify-center gap-2 transition-colors shadow-sm disabled:opacity-50 flex-1 sm:flex-none text-sm md:text-base"
                 >
                   <Save className="w-4 h-4" /> Save & Approve
                 </button>
               </div>
             </div>
 
-            <div className="flex-1 overflow-y-auto p-6 flex flex-col xl:flex-row gap-6">
+            <div className="flex-1 overflow-y-auto p-4 md:p-6 flex flex-col xl:flex-row gap-4 md:gap-6">
               
               {/* Left Column: Original Email */}
-              <div className="flex-1 bg-white rounded-xl shadow-sm border border-gray-200 p-5 overflow-hidden flex flex-col">
+              <div className="flex-1 bg-white rounded-xl shadow-sm border border-gray-200 p-4 md:p-5 overflow-hidden flex flex-col">
                 <div className="flex items-center gap-2 mb-4 text-gray-500 border-b border-gray-100 pb-3">
+
                   <Mail className="w-5 h-5" />
                   <h3 className="font-semibold text-gray-700">Original Email</h3>
                 </div>
@@ -307,7 +308,7 @@ export function ReviewQueue() {
               </div>
 
               {/* Right Column: Editable Extracted Fields */}
-              <div className="flex-1 bg-white rounded-xl shadow-sm border border-gray-200 p-5">
+              <div className="flex-1 bg-white rounded-xl shadow-sm border border-gray-200 p-4 md:p-5">
                 <h3 className="font-semibold text-gray-700 mb-4 border-b border-gray-100 pb-3">Extracted Details</h3>
                 
                 <div className="space-y-4">
