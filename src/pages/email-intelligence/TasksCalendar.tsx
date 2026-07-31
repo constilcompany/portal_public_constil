@@ -1,8 +1,8 @@
-import React, { useState, useEffect } from 'react';
+import { useState, useEffect } from 'react';
 import { createClient } from '@supabase/supabase-js';
 import { useSelector } from 'react-redux';
-import { Calendar as CalendarIcon, List, AlertCircle, Clock, CheckCircle2, Settings, X, Search, Filter, Sparkles, Loader2, Paperclip } from 'lucide-react';
-import { format, isToday, isTomorrow, addDays, isBefore, isAfter, startOfMonth, endOfMonth, eachDayOfInterval, isSameDay, getDay } from 'date-fns';
+import { Calendar as CalendarIcon, List, AlertCircle, Clock, CheckCircle2, Settings, X, Search, Sparkles, Loader2, Paperclip } from 'lucide-react';
+import { format, isToday, addDays, isBefore, startOfMonth, endOfMonth, eachDayOfInterval, isSameDay, getDay } from 'date-fns';
 import { useNavigate } from 'react-router-dom';
 import { nylasService } from '../../services/nylasService';
 import { toast } from 'react-toastify';

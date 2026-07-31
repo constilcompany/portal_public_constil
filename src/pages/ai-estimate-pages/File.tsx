@@ -9,7 +9,6 @@ import { useDispatch, useSelector } from 'react-redux';
 import { RootState } from '../../redux/store';
 import jsPDF from 'jspdf';
 import autoTable from 'jspdf-autotable';
-import { createClient } from '@supabase/supabase-js';
 import {
   ArrowLeft,
   Check,

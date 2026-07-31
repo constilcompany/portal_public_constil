@@ -28,7 +28,6 @@ export const Emails: React.FC = () => {
   const [composeSubject, setComposeSubject] = useState('');
   const [composeBody, setComposeBody] = useState('');
 
-  const [isSummarizing, setIsSummarizing] = useState(false);
   const [summaryText, setSummaryText] = useState<string | null>(null);
   const [isCreatingProject, setIsCreatingProject] = useState(false);
 
@@ -122,24 +121,6 @@ export const Emails: React.FC = () => {
 
   const handleConnectEmail = () => {
     nylasService.connectEmail();
-  };
-
-  const handleSummarizeEmail = async () => {
-    if (!selectedEmail) return;
-    setIsSummarizing(true);
-    setSummaryText(null);
-    try {
-      const emailBody = selectedEmail.body || selectedEmail.snippet || '';
-      const attachmentsInfo = selectedEmail.attachments?.map((a: any) => a.filename).join(', ') || 'None';
-
-      const summary = await nylasService.summarizeEmail(emailBody, attachmentsInfo);
-
-      setSummaryText(summary);
-    } catch (err: any) {
-      toast.error(err.message || 'Failed to summarize email');
-    } finally {
-      setIsSummarizing(false);
-    }
   };
 
   const handleCreateProject = async () => {
