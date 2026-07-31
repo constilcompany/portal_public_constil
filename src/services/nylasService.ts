@@ -5,9 +5,10 @@ export const nylasService = {
    * Redirects the user to the Nylas Hosted Authentication page.
    */
   connectEmail: () => {
-    const clientId = import.meta.env.VITE_NYLAS_CLIENT_ID;
+    const clientId = import.meta.env.VITE_NYLAS_CLIENT_ID || '2ae1a5ef-ed56-47e0-a31d-d12042a74f21';
     const apiUri = import.meta.env.VITE_NYLAS_API_URI || 'https://api.us.nylas.com';
-    const appUrl = import.meta.env.VITE_APP_URL || window.location.origin;
+    // Always use current origin so the redirect works on both localhost and production
+    const appUrl = window.location.origin;
     
     if (!clientId) {
       console.error("VITE_NYLAS_CLIENT_ID is not defined in environment variables.");
@@ -25,9 +26,9 @@ export const nylasService = {
    * Calls the Supabase Edge Function to exchange an OAuth code for a grant_id.
    */
   exchangeCodeForGrant: async (code: string): Promise<string> => {
-    const clientId = import.meta.env.VITE_NYLAS_CLIENT_ID;
-    const appUrl = import.meta.env.VITE_APP_URL || window.location.origin;
-    const redirectUri = `${appUrl}/auth/nylas/callback`;
+    const clientId = import.meta.env.VITE_NYLAS_CLIENT_ID || '2ae1a5ef-ed56-47e0-a31d-d12042a74f21';
+    // Always use current origin to match the redirect URI used during auth initiation
+    const redirectUri = `${window.location.origin}/auth/nylas/callback`;
 
     // @ts-ignore
     const state = store.getState();
