@@ -201,9 +201,9 @@ export function ReviewQueue() {
   };
 
   return (
-    <div className="flex flex-col md:flex-row h-screen bg-gray-50 text-gray-800">
+    <div className="flex flex-col md:flex-row h-[calc(100vh-64px)] bg-gray-50 text-gray-800 overflow-hidden">
       {/* Left Sidebar: Queue List */}
-      <div className="w-full md:w-1/3 h-1/3 md:h-auto bg-white border-b md:border-b-0 md:border-r border-gray-200 overflow-y-auto">
+      <div className={`w-full md:w-1/3 bg-white border-b md:border-b-0 md:border-r border-gray-200 overflow-y-auto ${selectedItem ? 'h-1/2 md:h-full' : 'h-full'}`}>
         <div className="p-4 border-b border-gray-200 bg-gray-50 flex flex-wrap items-center justify-between sticky top-0 z-10">
           <h2 className="text-lg font-semibold flex items-center gap-2">
             <LayoutTemplate className="w-5 h-5 text-blue-600" />
@@ -260,7 +260,7 @@ export function ReviewQueue() {
       </div>
 
       {/* Right Side: Detail & Edit View */}
-      <div className="w-full md:w-2/3 flex flex-col h-2/3 md:h-screen overflow-hidden bg-gray-50">
+      <div className={`w-full md:w-2/3 flex flex-col overflow-hidden bg-gray-50 ${selectedItem ? 'h-1/2 md:h-full' : 'hidden md:flex md:h-full'}`}>
         {selectedItem ? (
           <>
             {/* Action Bar */}
