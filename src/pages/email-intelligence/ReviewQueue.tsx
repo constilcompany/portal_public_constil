@@ -287,18 +287,18 @@ export function ReviewQueue() {
             <div className="flex-1 overflow-y-auto p-4 md:p-6 flex flex-col xl:flex-row gap-4 md:gap-6">
               
               {/* Left Column: Original Email */}
-              <div className="flex-1 bg-white rounded-xl shadow-sm border border-gray-200 p-4 md:p-5 overflow-hidden flex flex-col">
+              <div className="w-full xl:flex-1 bg-white rounded-xl shadow-sm border border-gray-200 p-4 md:p-5 flex flex-col min-h-[350px] xl:min-h-0">
                 <div className="flex items-center gap-2 mb-4 text-gray-500 border-b border-gray-100 pb-3">
 
                   <Mail className="w-5 h-5" />
                   <h3 className="font-semibold text-gray-700">Original Email</h3>
                 </div>
                 
-                <div className="mb-4">
+                <div className="mb-4 shrink-0">
                   <p className="text-sm text-gray-500 mb-1">From</p>
                   <p className="font-medium text-gray-900">{selectedItem.raw_emails.sender}</p>
                 </div>
-                <div className="mb-4">
+                <div className="mb-4 shrink-0">
                   <p className="text-sm text-gray-500 mb-1">Subject</p>
                   <p className="font-medium text-gray-900">{selectedItem.raw_emails.subject}</p>
                 </div>
@@ -308,7 +308,7 @@ export function ReviewQueue() {
               </div>
 
               {/* Right Column: Editable Extracted Fields */}
-              <div className="flex-1 bg-white rounded-xl shadow-sm border border-gray-200 p-4 md:p-5">
+              <div className="w-full xl:flex-1 bg-white rounded-xl shadow-sm border border-gray-200 p-4 md:p-5 shrink-0">
                 <h3 className="font-semibold text-gray-700 mb-4 border-b border-gray-100 pb-3">Extracted Details</h3>
                 
                 <div className="space-y-4">
