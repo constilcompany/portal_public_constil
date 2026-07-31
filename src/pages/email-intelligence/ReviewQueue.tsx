@@ -2,6 +2,9 @@ import { useState, useEffect } from 'react';
 import { createClient } from '@supabase/supabase-js';
 import { useSelector } from 'react-redux';
 import { Check, X, Save, Clock, Mail, LayoutTemplate, RefreshCw, ArrowLeft } from 'lucide-react';
+import ReactMarkdown from 'react-markdown';
+import remarkGfm from 'remark-gfm';
+import rehypeRaw from 'rehype-raw';
 import { nylasService } from '../../services/nylasService';
 
 const supabaseUrl = import.meta.env.VITE_SUPABASE_URL || '';
@@ -58,6 +61,19 @@ export function ReviewQueue() {
       }
     }
     setLoading(false);
+  };
+
+  const getFormattedSender = (senderStr: string) => {
+    if (!senderStr) return 'Unknown';
+    try {
+      const parsed = JSON.parse(senderStr);
+      if (Array.isArray(parsed) && parsed.length > 0) {
+        return parsed.map((s: any) => s.name ? `${s.name} <${s.email}>` : s.email).join(', ');
+      }
+    } catch (e) {
+      // Not JSON, return as is
+    }
+    return senderStr;
   };
 
   const selectItem = (item: any) => {
@@ -252,7 +268,7 @@ export function ReviewQueue() {
                   </span>
                 </div>
                 <h3 className="font-medium text-gray-900 truncate mt-2">{item.raw_emails.subject}</h3>
-                <p className="text-sm text-gray-500 truncate">{item.raw_emails.sender}</p>
+                <p className="text-sm text-gray-500 truncate">{getFormattedSender(item.raw_emails.sender)}</p>
               </div>
             ))}
           </div>
@@ -303,16 +319,33 @@ export function ReviewQueue() {
                   <h3 className="font-semibold text-gray-700">Original Email</h3>
                 </div>
                 
-                <div className="mb-4 shrink-0">
+                <div className="mb-4 shrink-0 w-full overflow-hidden">
                   <p className="text-sm text-gray-500 mb-1">From</p>
-                  <p className="font-medium text-gray-900">{selectedItem.raw_emails.sender}</p>
+                  <p className="font-medium text-gray-900 break-words">{getFormattedSender(selectedItem.raw_emails.sender)}</p>
                 </div>
-                <div className="mb-4 shrink-0">
+                <div className="mb-4 shrink-0 w-full overflow-hidden">
                   <p className="text-sm text-gray-500 mb-1">Subject</p>
-                  <p className="font-medium text-gray-900">{selectedItem.raw_emails.subject}</p>
+                  <p className="font-medium text-gray-900 break-words">{selectedItem.raw_emails.subject}</p>
                 </div>
-                <div className="flex-1 overflow-y-auto bg-gray-50 rounded-lg p-4 border border-gray-100 text-sm whitespace-pre-wrap">
-                  {selectedItem.raw_emails.body}
+                <div className="h-64 xl:flex-1 xl:h-auto overflow-y-auto bg-gray-50 rounded-lg p-5 border border-gray-100 text-sm">
+                  <ReactMarkdown 
+                    remarkPlugins={[remarkGfm]} 
+                    rehypePlugins={[rehypeRaw]}
+                    components={{
+                      h1: ({node, ...props}) => <h1 className="text-xl font-bold text-gray-900 mt-6 mb-4" {...props} />,
+                      h2: ({node, ...props}) => <h2 className="text-lg font-bold text-gray-900 mt-5 mb-3" {...props} />,
+                      h3: ({node, ...props}) => <h3 className="text-base font-bold text-gray-900 mt-4 mb-2" {...props} />,
+                      p: ({node, ...props}) => <p className="text-gray-700 leading-relaxed mb-4 last:mb-0" {...props} />,
+                      ul: ({node, ...props}) => <ul className="list-disc pl-5 text-gray-700 mb-4 space-y-1" {...props} />,
+                      ol: ({node, ...props}) => <ol className="list-decimal pl-5 text-gray-700 mb-4 space-y-1" {...props} />,
+                      li: ({node, ...props}) => <li className="mb-1" {...props} />,
+                      strong: ({node, ...props}) => <strong className="font-semibold text-gray-900" {...props} />,
+                      a: ({node, ...props}) => <a className="text-blue-600 hover:underline" {...props} />,
+                      blockquote: ({node, ...props}) => <blockquote className="border-l-4 border-gray-200 pl-4 py-1 italic text-gray-600 my-4" {...props} />
+                    }}
+                  >
+                    {selectedItem.raw_emails.body}
+                  </ReactMarkdown>
                 </div>
               </div>
 
