@@ -4,6 +4,27 @@ import { nylasService } from '../../services/nylasService';
 import { Loader2 } from 'lucide-react';
 import { createClient } from '@supabase/supabase-js';
 
+
+/** Maps raw Nylas/API error messages to friendly user-facing text */
+const getFriendlyError = (raw: string): string => {
+  if (raw.includes('maximum_number_of_sandbox_grants_reached') || raw.includes('26010')) {
+    return 'Our email integration is currently at capacity. Please contact support and we will get you connected shortly.';
+  }
+  if (raw.includes('invalid_query_params') || raw.includes('not allowed') || raw.includes('RedirectURI')) {
+    return 'There was a configuration issue with the email connection. Please contact support.';
+  }
+  if (raw.includes('grant.not_found') || raw.includes('No Grant found')) {
+    return 'Your email session expired. Please try connecting your email again.';
+  }
+  if (raw.includes('401') || raw.includes('Unauthorized')) {
+    return 'Authentication failed. Please log in again and try connecting your email.';
+  }
+  if (raw.includes('Failed to authenticate')) {
+    return 'We could not verify your email account. Please try again.';
+  }
+  return 'Something went wrong while connecting your email. Please try again or contact support.';
+};
+
 export const AuthCallback: React.FC = () => {
   const [searchParams] = useSearchParams();
   const navigate = useNavigate();
@@ -80,7 +101,8 @@ export const AuthCallback: React.FC = () => {
         }
       } catch (err: any) {
         console.error("Nylas auth error:", err);
-        setError(err.message || 'An error occurred during authentication.');
+        const friendlyError = getFriendlyError(err.message || '');
+        setError(friendlyError);
       }
     };
 
@@ -94,15 +116,24 @@ export const AuthCallback: React.FC = () => {
         
         {error ? (
           <div className="mt-4">
-            <div className="p-4 bg-red-50 text-red-600 rounded-xl text-sm mb-6">
-              {error}
+            <div className="p-4 bg-red-50 border border-red-100 rounded-xl mb-6 text-left">
+              <p className="text-red-700 font-semibold text-sm mb-1">⚠️ Connection Failed</p>
+              <p className="text-red-600 text-sm leading-relaxed">{error}</p>
             </div>
-            <button
-              onClick={() => navigate('/estimates/ai/file')}
-              className="px-6 py-2.5 bg-gray-900 hover:bg-gray-800 text-white rounded-xl text-sm font-semibold transition-all"
-            >
-              Return to App
-            </button>
+            <div className="flex gap-3 justify-center">
+              <button
+                onClick={() => navigate('/emails')}
+                className="px-5 py-2.5 bg-gray-100 hover:bg-gray-200 text-gray-700 rounded-xl text-sm font-semibold transition-all"
+              >
+                Return to App
+              </button>
+              <button
+                onClick={() => navigate('/emails')}
+                className="px-5 py-2.5 bg-gray-900 hover:bg-gray-800 text-white rounded-xl text-sm font-semibold transition-all"
+              >
+                Try Again
+              </button>
+            </div>
           </div>
         ) : (
           <div className="mt-8 flex flex-col items-center">
