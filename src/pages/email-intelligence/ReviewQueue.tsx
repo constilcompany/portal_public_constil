@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react';
 import { createClient } from '@supabase/supabase-js';
 import { useSelector } from 'react-redux';
-import { Check, X, Save, Clock, Mail, LayoutTemplate, RefreshCw } from 'lucide-react';
+import { Check, X, Save, Clock, Mail, LayoutTemplate, RefreshCw, ArrowLeft } from 'lucide-react';
 import { nylasService } from '../../services/nylasService';
 
 const supabaseUrl = import.meta.env.VITE_SUPABASE_URL || '';
@@ -203,7 +203,7 @@ export function ReviewQueue() {
   return (
     <div className="flex flex-col md:flex-row h-[calc(100vh-64px)] bg-gray-50 text-gray-800 overflow-hidden">
       {/* Left Sidebar: Queue List */}
-      <div className={`w-full md:w-1/3 bg-white border-b md:border-b-0 md:border-r border-gray-200 overflow-y-auto ${selectedItem ? 'h-1/2 md:h-full' : 'h-full'}`}>
+      <div className={`w-full md:w-1/3 bg-white border-b md:border-b-0 md:border-r border-gray-200 overflow-y-auto ${selectedItem ? 'hidden md:block h-full' : 'h-full'}`}>
         <div className="p-4 border-b border-gray-200 bg-gray-50 flex flex-wrap items-center justify-between sticky top-0 z-10">
           <h2 className="text-lg font-semibold flex items-center gap-2">
             <LayoutTemplate className="w-5 h-5 text-blue-600" />
@@ -260,12 +260,21 @@ export function ReviewQueue() {
       </div>
 
       {/* Right Side: Detail & Edit View */}
-      <div className={`w-full md:w-2/3 flex flex-col overflow-hidden bg-gray-50 ${selectedItem ? 'h-1/2 md:h-full' : 'hidden md:flex md:h-full'}`}>
+      <div className={`w-full md:w-2/3 flex flex-col overflow-hidden bg-gray-50 ${selectedItem ? 'h-full' : 'hidden md:flex md:h-full'}`}>
         {selectedItem ? (
           <>
             {/* Action Bar */}
             <div className="bg-white border-b border-gray-200 px-4 md:px-6 py-4 flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 sm:gap-0 shadow-sm z-10">
-              <h2 className="text-lg md:text-xl font-bold text-gray-800">Validate AI Extraction</h2>
+              <div className="flex items-center gap-2">
+                <button 
+                  onClick={() => selectItem(null)}
+                  className="md:hidden p-1 -ml-2 text-gray-500 hover:text-gray-700 hover:bg-gray-100 rounded-full transition-colors"
+                  title="Back to queue"
+                >
+                  <ArrowLeft className="w-5 h-5" />
+                </button>
+                <h2 className="text-lg md:text-xl font-bold text-gray-800">Validate AI Extraction</h2>
+              </div>
               <div className="flex gap-2 md:gap-3 w-full sm:w-auto">
                 <button 
                   onClick={handleReject} 
