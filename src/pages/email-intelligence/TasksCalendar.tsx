@@ -9,6 +9,7 @@ import { toast } from 'react-toastify';
 
 const supabaseUrl = import.meta.env.VITE_SUPABASE_URL || '';
 const supabaseAnonKey = import.meta.env.VITE_SUPABASE_ANON_KEY || '';
+
 const supabase = createClient(supabaseUrl, supabaseAnonKey);
 
 type ViewMode = 'list' | 'calendar';
@@ -414,64 +415,137 @@ export function TasksCalendar() {
 
       ) : (
 
-        /* CALENDAR VIEW */
-        <div className="bg-white rounded-xl shadow-sm border border-gray-200 overflow-hidden">
-          <div className="flex items-center justify-between p-4 border-b border-gray-200 bg-gray-50">
-            <h2 className="text-lg font-bold text-gray-800">{format(currentDate, 'MMMM yyyy')}</h2>
-            <div className="flex gap-2">
-              <button 
-                onClick={() => setCurrentDate(addDays(currentDate, -30))}
-                className="p-1 hover:bg-gray-200 rounded"
-              >
-                &larr;
-              </button>
-              <button 
-                onClick={() => setCurrentDate(new Date())}
-                className="px-3 py-1 bg-white border border-gray-300 rounded text-sm hover:bg-gray-50"
-              >
-                Today
-              </button>
-              <button 
-                onClick={() => setCurrentDate(addDays(currentDate, 30))}
-                className="p-1 hover:bg-gray-200 rounded"
-              >
-                &rarr;
-              </button>
-            </div>
-          </div>
-          
-          <div className="grid grid-cols-7 border-b border-gray-200 bg-gray-50">
-            {['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'].map(d => (
-              <div key={d} className="p-2 text-center text-xs font-semibold text-gray-500 uppercase">{d}</div>
-            ))}
-          </div>
-          
-          <div className="grid grid-cols-7 auto-rows-fr">
-            {Array.from({ length: startDay }).map((_, i) => (
-              <div key={`empty-${i}`} className="min-h-[100px] border-r border-b border-gray-100 bg-gray-50/50"></div>
-            ))}
-            
-            {daysInMonth.map(day => {
-              const dayTasks = tasks.filter(t => t.due_date && isSameDay(new Date(t.due_date), day));
-              return (
-                <div key={day.toString()} className={`min-h-[100px] border-r border-b border-gray-100 p-1 ${isToday(day) ? 'bg-blue-50/30' : ''}`}>
-                  <div className={`text-xs font-medium p-1 mb-1 ${isToday(day) ? 'text-blue-600 bg-blue-100 w-6 h-6 flex items-center justify-center rounded-full' : 'text-gray-500'}`}>
-                    {format(day, 'd')}
-                  </div>
-                  <div className="space-y-1">
-                    {dayTasks.map(t => (
-                      <div 
-                        key={t.id} 
-                        onClick={() => setSelectedTask(t)}
-                        className={`text-[10px] p-1 rounded cursor-pointer truncate ${t.status === 'completed' ? 'bg-gray-100 text-gray-500 line-through' : 'bg-blue-100 text-blue-700 hover:bg-blue-200'}`}
-                      >
-                        {t.title}
-                      </div>
-                    ))}
-                  </div>
+        /* CALENDAR VIEW (RESOURCE SCHEDULER) */
+        <div className="flex bg-white rounded-2xl shadow-[0_8px_30px_rgb(0,0,0,0.04)] border border-gray-200 overflow-hidden min-h-[600px] transition-all duration-300">
+          {/* Main Calendar Area */}
+          <div className="flex-1 flex flex-col min-w-0 overflow-x-auto bg-gray-50/30">
+            <div className="p-3 px-5 border-b border-gray-200 flex items-center justify-between bg-white sticky left-0 right-0">
+              <div className="flex items-center gap-4">
+                <h2 className="text-[22px] font-bold text-gray-900 tracking-tight">
+                  {format(currentDate, 'MMM d')} – {format(addDays(currentDate, 6), 'MMM d')}
+                </h2>
+                <div className="flex items-center bg-gray-100/80 p-1 rounded-xl shadow-inner border border-gray-200/60">
+                  <button onClick={() => setCurrentDate(addDays(currentDate, -7))} className="px-3 py-1.5 bg-transparent hover:bg-white rounded-md text-gray-600 transition-all font-medium text-sm">&lt;</button>
+                  <button onClick={() => setCurrentDate(new Date())} className="px-4 py-1.5 mx-1 bg-white shadow-sm rounded-md text-sm font-semibold text-gray-800 transition-all">Today</button>
+                  <button onClick={() => setCurrentDate(addDays(currentDate, 7))} className="px-3 py-1.5 bg-transparent hover:bg-white rounded-md text-gray-600 transition-all font-medium text-sm">&gt;</button>
                 </div>
-              );
-            })}
+              </div>
+              
+              <div>
+              </div>
+            </div>
+            
+            <div className="flex-1 overflow-auto">
+              {/* Grid Header */}
+              <div className="flex border-b border-gray-200 bg-gray-50/95 backdrop-blur-sm min-w-max sticky top-0 z-20 shadow-sm">
+                <div className="w-64 shrink-0 border-r border-gray-200 p-4 text-xs font-bold text-gray-500 uppercase tracking-wider flex items-center justify-between bg-gray-50/95 backdrop-blur-sm sticky left-0 z-30">
+                  First Name <span className="text-[10px] opacity-50">v</span>
+                </div>
+                {Array.from({length: 7}).map((_, i) => {
+                  const day = addDays(currentDate, i);
+                  return (
+                    <div key={i} className="flex-1 min-w-[140px] p-2 border-r border-gray-200 text-center">
+                      <div className={`text-xs font-bold uppercase tracking-widest ${isToday(day) ? "text-blue-600 bg-blue-50 py-1 rounded-md" : "text-gray-500"}`}>{format(day, 'EEE d')}</div>
+                      
+                    </div>
+                  );
+                })}
+              </div>
+              
+              {/* Grid Body */}
+              <div className="min-w-max">
+                {/* Dynamically extract senders as "Rows" */}
+                {(() => {
+                  // Helper to parse sender
+                  const parseSender = (senderStr) => {
+                    if (!senderStr) return 'Self/System';
+                    try {
+                      const parsed = JSON.parse(senderStr);
+                      if (Array.isArray(parsed) && parsed.length > 0) {
+                        return parsed[0].name || parsed[0].email || 'Unknown Sender';
+                      }
+                    } catch (e) {
+                      // ignore
+                    }
+                    const match = senderStr.match(/^([^<]+)/);
+                    return match ? match[1].trim() : senderStr;
+                  };
+                  
+                  // We map all tasks. If a task has no due_date, we render it on 'Today'.
+                  const getTaskDate = (t) => t.due_date ? new Date(t.due_date) : new Date();
+
+                  // Group tasks by sender
+                  const senders = Array.from(new Set(tasks.map(t => parseSender(t.raw_emails?.sender))));
+                  
+                  // Sort tasks by due date
+                  const sortedTasks = [...tasks].sort((a, b) => getTaskDate(a).getTime() - getTaskDate(b).getTime());
+                  
+                  const colors = ['bg-pink-600', 'bg-[#6b9c65]', 'bg-blue-400', 'bg-purple-600', 'bg-[#a3792c]'];
+                  const avatarColors = ['bg-pink-100 text-pink-700', 'bg-green-100 text-green-700', 'bg-blue-100 text-blue-700', 'bg-purple-100 text-purple-700', 'bg-amber-100 text-amber-700'];
+
+                  return senders.map((sender, i) => {
+                    const senderTasks = sortedTasks.filter(t => parseSender(t.raw_emails?.sender) === sender);
+                    const colorClass = avatarColors[i % avatarColors.length];
+                    const shiftColor = colors[i % colors.length];
+                    const initial = sender.charAt(0).toUpperCase();
+                    
+                    const senderName = sender;
+
+                    return (
+                      <div key={sender} className="flex border-b border-gray-200 hover:bg-gray-50/70 transition-colors group bg-white">
+                        {/* User Column */}
+                        <div 
+                          className="w-64 shrink-0 border-r border-gray-200 p-4 px-5 flex items-center gap-4 bg-white group-hover:bg-gray-50/80 transition-all sticky left-0 z-10 shadow-[2px_0_4px_rgba(0,0,0,0.02)] cursor-pointer relative after:absolute after:inset-y-0 after:right-0 after:w-[3px] after:bg-blue-500 after:opacity-0 hover:after:opacity-100"
+                          onClick={() => {
+                            if (senderTasks.length > 0) {
+                              const earliestDate = new Date(Math.min(...senderTasks.map(t => getTaskDate(t).getTime())));
+                              setCurrentDate(earliestDate);
+                            }
+                          }}
+                          title="Click to jump to this sender's tasks"
+                        >
+                          <div className={`w-8 h-8 rounded-full flex items-center justify-center font-bold text-sm ${colorClass}`}>
+                            {initial}
+                          </div>
+                          <div className="overflow-hidden">
+                            <div className="text-[13px] font-semibold text-gray-900 leading-tight truncate">{senderName}</div>
+                            <div className="text-[11px] text-gray-500 font-medium truncate">{senderTasks.length} task(s)</div>
+                          </div>
+                        </div>
+                        
+                        {/* Days Columns */}
+                        {Array.from({length: 7}).map((_, j) => {
+                          const day = addDays(currentDate, j);
+                          
+                          // Find tasks for this sender on this day using getTaskDate
+                          const dayTasks = senderTasks.filter(t => isSameDay(getTaskDate(t), day));
+                          
+                          return (
+                            <div key={j} className="flex-1 min-w-[140px] p-1.5 border-r border-gray-200 relative min-h-[60px] group-hover:bg-gray-50/30 transition-colors">
+                              {dayTasks.map((t, k) => (
+                                <div 
+                                  key={t.id}
+                                  onClick={() => setSelectedTask(t)}
+                                  className={`rounded-lg p-2.5 mb-2 text-[11px] text-white font-medium cursor-pointer shadow-sm ${t.status === 'completed' ? 'bg-gray-400 opacity-60' : shiftColor} flex flex-col justify-center leading-relaxed hover:shadow-md hover:-translate-y-0.5 transform transition-all duration-200 border-l-4 border-white/30 backdrop-blur-sm bg-opacity-95`}
+                                  title={t.title}
+                                >
+                                  <div className="truncate font-semibold text-xs drop-shadow-sm">{t.title}</div><div className="truncate uppercase text-white/80 text-[9px] mt-1 tracking-widest font-bold">{t.status}</div>
+                                </div>
+                              ))}
+                              
+                              {/* Corner marker if there are tasks */}
+                              {dayTasks.length > 0 && (
+                                <div className="absolute top-0 right-0 w-0 h-0 border-t-[8px] border-r-[8px] border-t-white border-r-transparent opacity-50 mix-blend-overlay pointer-events-none"></div>
+                              )}
+                            </div>
+                          );
+                        })}
+                      </div>
+                    );
+                  });
+                })()}
+              </div>
+            </div>
           </div>
         </div>
       )}
