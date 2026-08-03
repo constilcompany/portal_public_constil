@@ -2,7 +2,7 @@ import { useState, useEffect } from 'react';
 import { createClient } from '@supabase/supabase-js';
 import { useSelector } from 'react-redux';
 import { Calendar as CalendarIcon, List, AlertCircle, Clock, CheckCircle2, Settings, X, Search, Sparkles, Loader2, Paperclip } from 'lucide-react';
-import { format, isToday, addDays, isBefore, startOfMonth, endOfMonth, eachDayOfInterval, isSameDay, getDay } from 'date-fns';
+import { format, isToday, addDays, isBefore, isSameDay } from 'date-fns';
 import { useNavigate } from 'react-router-dom';
 import { nylasService } from '../../services/nylasService';
 import { toast } from 'react-toastify';
@@ -284,11 +284,6 @@ export function TasksCalendar() {
   );
 
   // Calendar Logic
-  const daysInMonth = eachDayOfInterval({
-    start: startOfMonth(currentDate),
-    end: endOfMonth(currentDate)
-  });
-  const startDay = getDay(startOfMonth(currentDate));
 
   return (
     <div className="p-6 max-w-7xl mx-auto text-gray-800">
@@ -457,7 +452,7 @@ export function TasksCalendar() {
                 {/* Dynamically extract senders as "Rows" */}
                 {(() => {
                   // Helper to parse sender
-                  const parseSender = (senderStr) => {
+                  const parseSender = (senderStr: any) => {
                     if (!senderStr) return 'Self/System';
                     try {
                       const parsed = JSON.parse(senderStr);
@@ -472,7 +467,7 @@ export function TasksCalendar() {
                   };
                   
                   // We map all tasks. If a task has no due_date, we render it on 'Today'.
-                  const getTaskDate = (t) => t.due_date ? new Date(t.due_date) : new Date();
+                  const getTaskDate = (t: any) => t.due_date ? new Date(t.due_date) : new Date();
 
                   // Group tasks by sender
                   const senders = Array.from(new Set(tasks.map(t => parseSender(t.raw_emails?.sender))));
@@ -522,7 +517,7 @@ export function TasksCalendar() {
                           
                           return (
                             <div key={j} className="flex-1 min-w-[140px] p-1.5 border-r border-gray-200 relative min-h-[60px] group-hover:bg-gray-50/30 transition-colors">
-                              {dayTasks.map((t, k) => (
+                              {dayTasks.map((t) => (
                                 <div 
                                   key={t.id}
                                   onClick={() => setSelectedTask(t)}
