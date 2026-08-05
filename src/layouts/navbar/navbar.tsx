@@ -10,14 +10,14 @@ import { useDispatch, useSelector } from 'react-redux';
 import { clearAuth } from '../../redux/authSlice';
 import { useGetUserProfileQuery } from '../../services/rtkapi/invoiceApi';
 import { S3UploadService } from '../../components/data/s3-data';
-import { Badge } from '@mui/material';
-import NotificationsIcon from '@mui/icons-material/Notifications';
-import { createClient } from '@supabase/supabase-js';
-import { useNavigate } from 'react-router-dom';
+// import { Badge } from '@mui/material';
+// import NotificationsIcon from '@mui/icons-material/Notifications';
+// import { createClient } from '@supabase/supabase-js';
+// import { useNavigate } from 'react-router-dom';
 
-const supabaseUrl = import.meta.env.VITE_SUPABASE_URL || '';
-const supabaseAnonKey = import.meta.env.VITE_SUPABASE_ANON_KEY || '';
-const supabase = createClient(supabaseUrl, supabaseAnonKey);
+// const supabaseUrl = import.meta.env.VITE_SUPABASE_URL || '';
+// const supabaseAnonKey = import.meta.env.VITE_SUPABASE_ANON_KEY || '';
+// const supabase = createClient(supabaseUrl, supabaseAnonKey);
 
 interface navbarProps {
   onMenuClick?: () => void;
@@ -28,10 +28,10 @@ export function Navbar({ onMenuClick, isWelcomePage }: navbarProps) {
   const { data, refetch } = useGetUserProfileQuery();
   const user = useSelector((state: { auth: { user: any } }) => state.auth.user);
   const [anchorEl, setAnchorEl] = useState<null | HTMLElement>(null);
-  const [pendingCount, setPendingCount] = useState(0);
-  const navigate = useNavigate();
+  // const [pendingCount, setPendingCount] = useState(0);
+  // const navigate = useNavigate();
 
-  useEffect(() => {
+  /* useEffect(() => {
     // Initial fetch of pending emails
     const fetchPendingCount = async () => {
       const { count } = await supabase
@@ -39,7 +39,7 @@ export function Navbar({ onMenuClick, isWelcomePage }: navbarProps) {
         .select('*', { count: 'exact', head: true })
         .eq('status', 'pending');
       
-      setPendingCount(count || 0);
+      // setPendingCount(count || 0);
     };
 
     fetchPendingCount();
@@ -52,7 +52,7 @@ export function Navbar({ onMenuClick, isWelcomePage }: navbarProps) {
         { event: 'INSERT', schema: 'public', table: 'review_queue' },
         (payload) => {
           if (payload.new && payload.new.status === 'pending') {
-            setPendingCount((prev) => prev + 1);
+            // setPendingCount((prev) => prev + 1);
           }
         }
       )
@@ -61,9 +61,9 @@ export function Navbar({ onMenuClick, isWelcomePage }: navbarProps) {
         { event: 'UPDATE', schema: 'public', table: 'review_queue' },
         (payload) => {
           if (payload.new && payload.new.status !== 'pending' && payload.old.status === 'pending') {
-            setPendingCount((prev) => Math.max(0, prev - 1));
+            // setPendingCount((prev) => Math.max(0, prev - 1));
           } else if (payload.new && payload.new.status === 'pending' && payload.old.status !== 'pending') {
-            setPendingCount((prev) => prev + 1);
+            // setPendingCount((prev) => prev + 1);
           }
         }
       )
@@ -72,7 +72,7 @@ export function Navbar({ onMenuClick, isWelcomePage }: navbarProps) {
     return () => {
       supabase.removeChannel(subscription);
     };
-  }, []);
+  }, []); */
 
   useEffect(() => {
     if (user?.name) {

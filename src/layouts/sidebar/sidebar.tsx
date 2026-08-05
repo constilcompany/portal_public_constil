@@ -1,6 +1,6 @@
 import { useNavigate, useLocation } from "react-router-dom";
 import type { ComponentType, SVGProps } from "react";
-import { Headphones, Sparkles, Mail, Calendar, Workflow } from "lucide-react";
+import { Headphones, Sparkles } from "lucide-react";
 import IconHome from "../../assets/icons/homeIcone";
 import InvoiceIcone from "../../assets/icons/invoiceicone";
 import IconEstimates from "../../assets/icons/iconestimates";
