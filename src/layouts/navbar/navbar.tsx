@@ -143,7 +143,7 @@ export function Navbar({ onMenuClick, isWelcomePage }: navbarProps) {
             <UpgradeProfile />
           </Typography>
 
-          <IconButton 
+          {/* <IconButton 
             onClick={() => navigate('/review-queue')} 
             sx={{ ml: 2, mr: 1, color: 'gray' }}
             title="Review Queue"
@@ -151,7 +151,7 @@ export function Navbar({ onMenuClick, isWelcomePage }: navbarProps) {
             <Badge badgeContent={pendingCount} color="error" overlap="circular">
               <NotificationsIcon />
             </Badge>
-          </IconButton>
+          </IconButton> */}
 
           {data?.data?.register?.name || user ? (
             <>
