@@ -166,13 +166,20 @@ const InvoiceTemplateModal: React.FC<InvoiceTemplateModalProps> = ({
       // 4. Send Email
       await sendInvoiceEmail({
         invoice_id: invoiceId,
-        clients: [invoiceData.clientId]
+        clients: [foundClientId]
       }).unwrap();
 
       toast.success("Email sent successfully!");
     } catch (err: any) {
       console.error("Failed to send email:", err);
-      toast.error(err?.data?.error || err?.message || "Failed to send email");
+      const errorMsg = 
+        err?.response?.data?.error || 
+        err?.response?.data?.message || 
+        err?.data?.error || 
+        err?.data?.message || 
+        err?.message || 
+        "Failed to send email";
+      toast.error(typeof errorMsg === 'string' ? errorMsg : "Failed to send email");
     } finally {
       removePdfIframe?.();
       setIsSendingEmail(false);

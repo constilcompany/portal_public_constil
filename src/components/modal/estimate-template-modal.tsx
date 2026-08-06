@@ -216,10 +216,10 @@ const EstimateTemplateModal: React.FC<EstimateTemplateModalProps> = ({
         estimate_id: estimateId,
         template_id: selectedTemplate,
         pdf_url: s3Path,
-        clients: [transformedData.clientId]
+        clients: [foundClientId]
       };
       console.log("[EstimateModal] Sending Email via Axios:", emailPayload);
-      await axios.post(`${import.meta.env.VITE_SUPABASE_FUNCTIONS_URL}/user-api/template/send-estimate`, emailPayload, {
+      await axios.post(`/debug-supabase/functions/v1/user-api/template/send-estimate`, emailPayload, {
         headers: {
           "Content-Type": "application/json",
           Authorization: `Bearer ${localStorage.getItem("access_token")}`,
@@ -230,7 +230,15 @@ const EstimateTemplateModal: React.FC<EstimateTemplateModalProps> = ({
       toast.success("Email sent successfully!");
     } catch (err: any) {
       console.error("Failed to send email:", err);
-      toast.error(err?.data?.error || err?.message || "Failed to send email");
+      const errorMsg = 
+        err?.response?.data?.error || 
+        err?.response?.data?.message || 
+        err?.data?.error || 
+        err?.data?.message || 
+        err?.message || 
+        "Failed to send email";
+      
+      toast.error(typeof errorMsg === 'string' ? errorMsg : "Failed to send email");
     } finally {
       removePdfIframe?.();
       setIsSendingEmail(false);
