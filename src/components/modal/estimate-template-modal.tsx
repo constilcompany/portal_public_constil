@@ -219,7 +219,11 @@ const EstimateTemplateModal: React.FC<EstimateTemplateModalProps> = ({
         clients: [foundClientId]
       };
       console.log("[EstimateModal] Sending Email via Axios:", emailPayload);
-      await axios.post(`/debug-supabase/functions/v1/user-api/template/send-estimate`, emailPayload, {
+      const functionsUrl = import.meta.env.DEV 
+        ? '/debug-supabase/functions/v1/user-api/template/send-estimate'
+        : `${import.meta.env.VITE_APP_API_URL.replace('/rest/v1', '')}/functions/v1/user-api/template/send-estimate`;
+        
+      await axios.post(functionsUrl, emailPayload, {
         headers: {
           "Content-Type": "application/json",
           Authorization: `Bearer ${localStorage.getItem("access_token")}`,
