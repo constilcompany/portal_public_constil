@@ -19,6 +19,11 @@ export default defineConfig(({ mode }) => {
       port: 5173,
       strictPort: true,
       proxy: {
+        '/debug-supabase': {
+          target: 'https://avppbvsxayehguepyjkb.supabase.co',
+          changeOrigin: true,
+          rewrite: (path) => path.replace(/^\/debug-supabase/, '')
+        },
         '/api-fast': {
           target: fastApiTarget,
           changeOrigin: true,

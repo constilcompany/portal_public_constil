@@ -10,7 +10,7 @@ interface MinimalRootState {
   auth: MinimalAuthState;
 }
 
-export const BASED_URL = import.meta.env.VITE_APP_API_URL ?? "";
+export const BASED_URL = import.meta.env.DEV ? '/debug-supabase/rest/v1' : (import.meta.env.VITE_APP_API_URL ?? "");
 
 const rawBaseQuery = fetchBaseQuery({
   baseUrl: BASED_URL,
