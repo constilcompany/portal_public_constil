@@ -14,7 +14,7 @@ import EstimateFollowupsList from './estimate-followups-list';
 
 const OptionEstimateCreated = () => {
   const [searchParams, setSearchParams] = useSearchParams();
-  const initialTab = searchParams.get('tab') === 'automated-sequences' ? 1 : 0;
+  const initialTab = 0; // searchParams.get('tab') === 'automated-sequences' ? 1 : 0;
   const [selectedTab, setSelectedTab] = useState<number>(initialTab);
   const [page, setPage] = useState<number>(1);
   const itemsPerPage = 9;
@@ -84,9 +84,9 @@ const OptionEstimateCreated = () => {
   }
 
   const renderTabContent = () => {
-    if (selectedTab === 1) {
-      return <EstimateFollowupsList />;
-    }
+    // if (selectedTab === 1) {
+    //   return <EstimateFollowupsList />;
+    // }
 
     if (!search && totalEstimations === 0 && !isLoading) {
       return (
@@ -217,14 +217,14 @@ const OptionEstimateCreated = () => {
                   minWidth: 'auto',
                 }}
               />
-              <Tab
+              {/* <Tab
                 label="Automated Sequences"
                 className="!text-gray-500 hover:!text-[#448AFF]"
                 sx={{
                   padding: { xs: '6px 10px', sm: '6px 14px' },
                   minWidth: 'auto',
                 }}
-              />
+              /> */}
             </Tabs>
           </div>
 
