@@ -41,6 +41,8 @@ import 'jspdf/dist/polyfills.es.js';
 // @ts-ignore
 import 'jspdf/dist/jspdf.es.min.js';
 import { useNavigate } from 'react-router-dom';
+import axios from 'axios';
+import { S3UploadService } from '../../components/data/s3-data';
 
 
 type XlsxLib = typeof import('xlsx-js-style');
@@ -629,7 +631,9 @@ const File = () => {
     };
 
     // Helper: Draw footer on all pages
-    const drawContentFooter = (pageNum: number) => {
+    const drawContentFooter = () => {
+      // @ts-ignore
+      const pageNum = doc.internal.getNumberOfPages();
       doc.setDrawColor(220, 220, 220);
       doc.setLineWidth(0.5);
       doc.line(margin, pageHeight - 15, pageWidth - margin, pageHeight - 15);
@@ -639,6 +643,27 @@ const File = () => {
       doc.setTextColor(150, 150, 150);
       doc.text("Confidential & Proprietary", margin, pageHeight - 10);
       doc.text(`Page ${pageNum}`, pageWidth - margin - doc.getTextWidth(`Page ${pageNum}`), pageHeight - 10);
+    };
+
+    // Helper: Write text with auto-pagination
+    const writeTextWithPagination = (lines: string[], startX: number, initialY: number, lineSpacing: number) => {
+      let currentY = initialY;
+      const bottomMargin = pageHeight - 25;
+      
+      lines.forEach((line) => {
+        if (currentY > bottomMargin) {
+          drawContentFooter();
+          doc.addPage();
+          drawContentHeader();
+          currentY = 30; // Reset to top below header
+          doc.setFont("Times", "normal");
+          doc.setFontSize(12);
+          doc.setTextColor(71, 85, 105);
+        }
+        doc.text(line, startX, currentY);
+        currentY += lineSpacing;
+      });
+      return currentY;
     };
 
     // PAGE 1: COVER PAGE
@@ -732,7 +757,7 @@ const File = () => {
       }
     });
 
-    drawContentFooter(1);
+    drawContentFooter();
 
     // PAGE 2: PROJECT SUMMARY & SCOPE OF WORK
     doc.addPage();
@@ -747,11 +772,15 @@ const File = () => {
     doc.setFontSize(12);
     doc.setTextColor(71, 85, 105);
     const splitSummary = doc.splitTextToSize(proposalSummary, contentWidth);
-    doc.text(splitSummary, margin, 36, { lineHeightFactor: 1.5 });
+    let currentY = writeTextWithPagination(splitSummary, margin, 36, 6.35);
 
-    // Calculate Y for next section (with 1.5 spacing, 12pt is ~6.35mm per line)
-    const summaryHeight = splitSummary.length * 6.35;
-    let scopeY = 36 + summaryHeight + 15;
+    let scopeY = currentY + 15;
+    if (scopeY > pageHeight - 35) {
+      drawContentFooter();
+      doc.addPage();
+      drawContentHeader();
+      scopeY = 30;
+    }
 
     doc.setFont("Times", "bold");
     doc.setFontSize(12);
@@ -762,9 +791,9 @@ const File = () => {
     doc.setFontSize(12);
     doc.setTextColor(71, 85, 105);
     const splitScope = doc.splitTextToSize(proposalScope, contentWidth);
-    doc.text(splitScope, margin, scopeY + 6, { lineHeightFactor: 1.5 });
+    writeTextWithPagination(splitScope, margin, scopeY + 8, 6.35);
 
-    drawContentFooter(2);
+    drawContentFooter();
 
     // PAGE 3: TIMELINE & WARRANTY
     doc.addPage();
@@ -789,11 +818,17 @@ const File = () => {
 
     doc.setFont("Times", "normal");
     doc.setFontSize(12);
+    doc.setTextColor(71, 85, 105);
     const splitTimeline = doc.splitTextToSize(proposalTimelineNotes, contentWidth);
-    doc.text(splitTimeline, margin, 52, { lineHeightFactor: 1.5 });
+    let timelineY = writeTextWithPagination(splitTimeline, margin, 52, 6.35);
 
-    const timelineHeight = splitTimeline.length * 6.35;
-    let warrantyY = 52 + timelineHeight + 15;
+    let warrantyY = timelineY + 15;
+    if (warrantyY > pageHeight - 35) {
+      drawContentFooter();
+      doc.addPage();
+      drawContentHeader();
+      warrantyY = 30;
+    }
 
     doc.setFont("Times", "bold");
     doc.setFontSize(12);
@@ -810,9 +845,9 @@ const File = () => {
     doc.setFont("Times", "normal");
     doc.setFontSize(12);
     const splitWarranty = doc.splitTextToSize(proposalWarrantyTerms, contentWidth);
-    doc.text(splitWarranty, margin, warrantyY + 16, { lineHeightFactor: 1.5 });
+    writeTextWithPagination(splitWarranty, margin, warrantyY + 16, 6.35);
 
-    drawContentFooter(3);
+    drawContentFooter();
 
     // PAGE 4: BUDGET SUMMARY & SIGNATURES
     doc.addPage();
@@ -827,10 +862,9 @@ const File = () => {
     doc.setFontSize(12);
     doc.setTextColor(71, 85, 105);
     const splitPricingText = doc.splitTextToSize(proposalPricingText, contentWidth);
-    doc.text(splitPricingText, margin, 36, { lineHeightFactor: 1.5 });
+    let pricingCurrentY = writeTextWithPagination(splitPricingText, margin, 36, 6.35);
 
-    const pricingTextHeight = splitPricingText.length * 6.35;
-    let pricingTableY = 36 + pricingTextHeight + 6;
+    let pricingTableY = pricingCurrentY + 6;
 
     // Draw Budget summary grid
     const pricingRows = [
@@ -860,6 +894,13 @@ const File = () => {
 
     // @ts-ignore
     let sigY = doc.lastAutoTable.finalY + 15;
+
+    if (sigY > pageHeight - 70) {
+      drawContentFooter();
+      doc.addPage();
+      drawContentHeader();
+      sigY = 30;
+    }
 
     doc.setFont("Times", "bold");
     doc.setFontSize(12);
@@ -910,7 +951,7 @@ const File = () => {
       }
     }
 
-    drawContentFooter(4);
+    drawContentFooter();
     return doc;
   };
 
@@ -1043,19 +1084,14 @@ ${proposalPricingText}
       const doc = generateProposalPDF();
       const pdfBase64 = doc.output('datauristring').split(',')[1];
 
-      // Send using Nylas Service
-      const nylasGrantId = localStorage.getItem('nylas_grant_id');
-      if (!nylasGrantId) {
-        throw new Error("No connected email found. Please connect your email first.");
-      }
+      // Send using Supabase Edge Function
+      const supabaseUrl = import.meta.env.VITE_SUPABASE_URL || '';
+      const supabaseAnonKey = import.meta.env.VITE_SUPABASE_ANON_KEY || '';
+      const token = authToken || localStorage.getItem('access_token');
+      const userId = authUser?.id || localStorage.getItem('user_id');
 
       // Automatically track this AI estimate in the Automated Sequences
       try {
-        const supabaseUrl = import.meta.env.VITE_SUPABASE_URL || '';
-        const supabaseAnonKey = import.meta.env.VITE_SUPABASE_ANON_KEY || '';
-        const token = authToken || localStorage.getItem('access_token');
-        const userId = authUser?.id || localStorage.getItem('user_id');
-
         if (userId && token) {
           // 0. Get or Create a Client for this email
           let clientId = null;
@@ -1110,36 +1146,70 @@ ${proposalPricingText}
               total_amount: proposalPricingTotal,
               estimate_number: 'AI-' + Math.floor(1000 + Math.random() * 9000).toString(),
               estimate_date: new Date().toISOString(),
-              nylas_grant_id: nylasGrantId
+              nylas_grant_id: null
             })
           });
 
+          let estimateId = null;
           if (estimateRes.ok) {
-            console.log("Dummy estimate created successfully, trigger should handle followups!");
+            const estimateData = await estimateRes.json();
+            estimateId = estimateData[0]?.id;
+            console.log("Dummy estimate created successfully:", estimateId);
           } else {
             const dummyErr = await estimateRes.text();
             console.error("Failed to create dummy estimate:", dummyErr);
+            throw new Error("Failed to create estimate record");
+          }
+
+          if (estimateId && clientId) {
+            // Upload PDF to S3
+            const pdfBlob = doc.output('blob');
+            const pdfFile = new window.File([pdfBlob], `estimate_${estimateId}.pdf`, { type: 'application/pdf' });
+            
+            const s3Path = await S3UploadService.uploadFileInChunks(pdfFile, undefined, 'paybue-invoice-estimation/estimates');
+            const publicUrl = S3UploadService.getPublicUrl(s3Path, 'paybue-invoice-estimation/estimates');
+            
+            // Update dummy estimate with document_url
+            await fetch(`${supabaseUrl}/rest/v1/estimates?id=eq.${estimateId}`, {
+              method: 'PATCH',
+              headers: {
+                'Content-Type': 'application/json',
+                'apikey': supabaseAnonKey,
+                'Authorization': `Bearer ${token}`
+              },
+              body: JSON.stringify({ document_url: publicUrl })
+            });
+
+            // Call the same backend endpoint used by standard estimates
+            const emailPayload = {
+              estimate_id: estimateId,
+              template_id: 1, // Default fallback
+              pdf_url: s3Path,
+              clients: [clientId]
+            };
+            
+            const functionsUrl = import.meta.env.DEV 
+              ? '/debug-supabase/functions/v1/user-api/template/send-estimate'
+              : `${import.meta.env.VITE_APP_API_URL?.replace('/rest/v1', '') || supabaseUrl}/functions/v1/user-api/template/send-estimate`;
+              
+            await axios.post(functionsUrl, emailPayload, {
+              headers: {
+                "Content-Type": "application/json",
+                Authorization: `Bearer ${token}`,
+                'apikey': supabaseAnonKey
+              }
+            });
+            console.log("Successfully sent email via backend template endpoint");
+          } else {
+            throw new Error("Missing estimate ID or client ID to send email");
           }
         } else {
           console.error("Could not find userId or token to create tracking sequence");
+          throw new Error("Authentication required to send estimate");
         }
-      } catch (seqErr) {
-        console.error("Failed to setup automated sequence for AI estimate via REST:", seqErr);
-      }
-
-      const emailBodyText = `# CONSTRUCTION PROPOSAL & BUDGET ESTIMATE ##\n\nPlease find your detailed proposal and estimate attached as a PDF.`;
-
-      const { success, message } = await nylasService.sendEmail(
-        nylasGrantId,
-        customerEmail.trim(),
-        "Your Construction Proposal & Estimate",
-        emailBodyText,
-        pdfBase64,
-        "Proposal.pdf"
-      );
-
-      if (!success) {
-        throw new Error(message || "Failed to send email via Nylas");
+      } catch (seqErr: any) {
+        console.error("Failed to process AI estimate email:", seqErr);
+        throw new Error(seqErr.message || "Failed to process and send email");
       }
 
       toast.dismiss(loadingToast);
@@ -1157,9 +1227,8 @@ ${proposalPricingText}
       toast.dismiss(loadingToast);
       
       const errorMessage = err.message || "";
-      if (errorMessage === "Unauthorized" || errorMessage.includes("401") || errorMessage.includes("grant")) {
-        localStorage.removeItem('nylas_grant_id');
-        toast.error("Your email connection has expired or is invalid. Please go to the Emails tab to reconnect your account.");
+      if (errorMessage === "Unauthorized" || errorMessage.includes("401")) {
+        toast.error("Your session has expired. Please log in again.");
       } else {
         toast.error(errorMessage || "Failed to email quote. Please try again.");
       }
@@ -2792,40 +2861,21 @@ ${proposalPricingText}
 
             {/* Modal Body */}
             <div className="p-6">
-              {!localStorage.getItem('nylas_grant_id') ? (
-                <div className="text-center space-y-4 py-4">
-                  <div className="mx-auto w-12 h-12 bg-primary/10 text-primary rounded-full flex items-center justify-center mb-4">
-                    <Mail className="w-6 h-6" />
-                  </div>
-                  <h4 className="text-lg font-bold text-gray-900">Connect Your Email</h4>
-                  <p className="text-sm text-gray-500 max-w-sm mx-auto">
-                    To send estimates directly to your customers, please connect your Gmail or Outlook account.
-                  </p>
-                  <button
-                    onClick={() => nylasService.connectEmail()}
-                    className="mt-6 px-6 py-3 bg-primary hover:bg-[#3d7ef7] text-white rounded-xl text-sm font-semibold shadow-md transition-all flex items-center gap-2 mx-auto cursor-pointer"
-                  >
-                    <Mail className="w-4 h-4" />
-                    Connect Email Account
-                  </button>
+              <div className="space-y-4">
+                <div>
+                  <label htmlFor="customer-email-input" className="block text-xs font-semibold text-gray-500 uppercase tracking-wider mb-2">
+                    Customer Email Address
+                  </label>
+                  <EmailCombobox
+                    id="customer-email-input"
+                    value={customerEmail}
+                    onChange={(e: any) => setCustomerEmail(e.target.value)}
+                    placeholder="e.g. customer@example.com"
+                    className="w-full px-4 py-3 border border-gray-200 rounded-xl text-sm focus:border-primary focus:ring-2 focus:ring-primary/20 outline-none"
+                    disabled={isSendingEmail}
+                  />
                 </div>
-              ) : (
-                <div className="space-y-4">
-                  <div>
-                    <label htmlFor="customer-email-input" className="block text-xs font-semibold text-gray-500 uppercase tracking-wider mb-2">
-                      Customer Email Address
-                    </label>
-                    <EmailCombobox
-                      id="customer-email-input"
-                      value={customerEmail}
-                      onChange={(e: any) => setCustomerEmail(e.target.value)}
-                      placeholder="e.g. customer@example.com"
-                      className="w-full px-4 py-3 border border-gray-200 rounded-xl text-sm focus:border-primary focus:ring-2 focus:ring-primary/20 outline-none"
-                      disabled={isSendingEmail}
-                    />
-                  </div>
-                </div>
-              )}
+              </div>
             </div>
 
             {/* Modal Footer */}
@@ -2837,25 +2887,23 @@ ${proposalPricingText}
               >
                 Cancel
               </button>
-              {localStorage.getItem('nylas_grant_id') && (
-                <button
-                  onClick={handleSendQuote}
-                  disabled={isSendingEmail || !customerEmail.trim()}
-                  className="px-5 py-2.5 bg-primary hover:bg-[#3d7ef7] text-white rounded-xl text-sm font-semibold shadow-md active:scale-95 transition-all flex items-center gap-1.5 disabled:opacity-55 disabled:cursor-not-allowed cursor-pointer"
-                >
-                  {isSendingEmail ? (
-                    <>
-                      <Loader2 className="w-4 h-4 animate-spin" />
-                      Sending…
-                    </>
-                  ) : (
-                    <>
-                      <Send className="w-4 h-4" />
-                      Send
-                    </>
-                  )}
-                </button>
-              )}
+              <button
+                onClick={handleSendQuote}
+                disabled={isSendingEmail || !customerEmail.trim()}
+                className="px-5 py-2.5 bg-primary hover:bg-[#3d7ef7] text-white rounded-xl text-sm font-semibold shadow-md active:scale-95 transition-all flex items-center gap-1.5 disabled:opacity-55 disabled:cursor-not-allowed cursor-pointer"
+              >
+                {isSendingEmail ? (
+                  <>
+                    <Loader2 className="w-4 h-4 animate-spin" />
+                    Sending…
+                  </>
+                ) : (
+                  <>
+                    <Send className="w-4 h-4" />
+                    Send
+                  </>
+                )}
+              </button>
             </div>
           </div>
         </div>
