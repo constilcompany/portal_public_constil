@@ -1082,7 +1082,7 @@ ${proposalPricingText}
 
       // Generate PDF for sending
       const doc = generateProposalPDF();
-      const pdfBase64 = doc.output('datauristring').split(',')[1];
+      // const pdfBase64 = doc.output('datauristring').split(',')[1];
 
       // Send using Supabase Edge Function
       const supabaseUrl = import.meta.env.VITE_SUPABASE_URL || '';

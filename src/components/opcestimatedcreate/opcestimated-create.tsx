@@ -10,10 +10,10 @@ import { useAllEstimateQuery, useGetEstimatesQuery } from '../../services/rtkapi
 import { InvoiceModel } from '../../models/invoice';
 import FormInvoiceEstimate from '../../components/forminvoiceestimate/formin-voicestimate';
 import { useNavigate, useSearchParams } from 'react-router-dom';
-import EstimateFollowupsList from './estimate-followups-list';
+// import EstimateFollowupsList from './estimate-followups-list';
 
 const OptionEstimateCreated = () => {
-  const [searchParams, setSearchParams] = useSearchParams();
+  const [, setSearchParams] = useSearchParams();
   const initialTab = 0; // searchParams.get('tab') === 'automated-sequences' ? 1 : 0;
   const [selectedTab, setSelectedTab] = useState<number>(initialTab);
   const [page, setPage] = useState<number>(1);
