@@ -358,7 +358,7 @@ const File = () => {
   const [isSendingEmail, setIsSendingEmail] = useState(false);
   const [templateMetadata, setTemplateMetadata] = useState({
     date: '',
-    projectId: '',
+    projectId: `PRJ-${Math.floor(100000 + Math.random() * 900000)}`,
     address: '',
     scope: '',
     drawingRef: '',
@@ -1749,7 +1749,7 @@ ${proposalPricingText}
                         const lines = markdown.split('\n');
                         const metadata = {
                           date: '',
-                          projectId: '',
+                          projectId: templateMetadata.projectId || `PRJ-${Math.floor(100000 + Math.random() * 900000)}`,
                           address: '',
                           scope: '',
                           drawingRef: '',
@@ -2448,17 +2448,14 @@ ${proposalPricingText}
                             <input 
                               type="text" 
                               value={templateMetadata.projectId} 
-                              onChange={(e) => {
-                                const val = e.target.value;
-                                setTemplateMetadata(prev => ({ ...prev, projectId: val }));
-                              }}
-                              className="flex-1 bg-white border border-slate-200 rounded px-2.5 py-1.5 outline-none focus:border-primary"
+                              readOnly
+                              className="flex-1 bg-slate-100 text-slate-500 border border-slate-200 rounded px-2.5 py-1.5 outline-none cursor-not-allowed"
                             />
                           </div>
                           <div className="flex items-center gap-2">
                             <span className="text-slate-400 font-medium w-24 shrink-0">Date:</span>
                             <input 
-                              type="text" 
+                              type="date" 
                               value={templateMetadata.date} 
                               onChange={(e) => {
                                 const val = e.target.value;
