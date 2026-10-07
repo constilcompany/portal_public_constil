@@ -1,3 +1,4 @@
+/* eslint-disable @typescript-eslint/no-explicit-any */
 import axios from "axios";
 import { S3Client, PutObjectCommand, GetObjectCommand } from "@aws-sdk/client-s3";
 
@@ -5,16 +6,72 @@ const SUPABASE_URL = import.meta.env.VITE_SUPABASE_URL;
 const ANON_KEY = import.meta.env.VITE_SUPABASE_ANON_KEY;
 const DEFAULT_S3_BUCKET = import.meta.env.VITE_AWS_STORAGE_BUCKET_NAME || 'paybue-invoice-estimation';
 
-// AWS S3 Configuration
-const s3Client = new S3Client({
-  region: import.meta.env.VITE_AWS_REGION || "us-east-1",
-  credentials: {
-    accessKeyId: import.meta.env.VITE_AWS_ACCESS_KEY_ID,
-    secretAccessKey: import.meta.env.VITE_AWS_SECRET_ACCESS_KEY,
-  },
-});
+// AWS S3 Configuration (client fallback if credentials provided; otherwise presigned URLs are used)
+function createS3Client(): S3Client | null {
+  const accessKeyId = import.meta.env.VITE_AWS_ACCESS_KEY_ID;
+  const secretAccessKey = import.meta.env.VITE_AWS_SECRET_ACCESS_KEY;
+  if (!accessKeyId || !secretAccessKey) {
+    return null;
+  }
+  return new S3Client({
+    region: import.meta.env.VITE_AWS_REGION || "us-east-1",
+    credentials: {
+      accessKeyId,
+      secretAccessKey,
+    },
+  });
+}
+
+const s3Client = createS3Client();
 
 export class S3UploadService {
+  /* ================= SECURE PRESIGNED S3 UPLOAD (NO CLIENT SECRETS) ================= */
+  static async uploadBlueprintSecure(
+    file: File,
+    onProgress?: (percent: number) => void
+  ): Promise<{ pdf_key: string; upload_url: string }> {
+    const token = localStorage.getItem("access_token");
+    if (!token) throw new Error("Authentication required for blueprint upload.");
+
+    // 1. Request short-lived presigned upload URL from Supabase Edge Function
+    const edgeFunctionUrl = `${SUPABASE_URL}/functions/v1/blueprint-estimate/upload-url`;
+    const res = await axios.post(
+      edgeFunctionUrl,
+      {
+        filename: file.name,
+        file_size: file.size,
+        content_type: file.type || "application/pdf"
+      },
+      {
+        headers: {
+          'Authorization': `Bearer ${token}`,
+          'apikey': ANON_KEY,
+          'Content-Type': 'application/json'
+        }
+      }
+    );
+
+    const { upload_url, pdf_key } = res.data;
+    if (!upload_url || !pdf_key) {
+      throw new Error(res.data?.error || "Failed to obtain presigned upload URL from server.");
+    }
+
+    // 2. Direct PUT to S3 using the presigned URL
+    await axios.put(upload_url, file, {
+      headers: {
+        'Content-Type': 'application/pdf'
+      },
+      onUploadProgress: (progressEvent) => {
+        if (progressEvent.total) {
+          const percentCompleted = Math.round((progressEvent.loaded * 100) / progressEvent.total);
+          onProgress?.(percentCompleted);
+        }
+      }
+    });
+
+    return { pdf_key, upload_url };
+  }
+
   /* ================= DELETE FILE ================= */
   static async deleteFileFromS3(filePath: string) {
     try {
@@ -86,6 +143,7 @@ export class S3UploadService {
     }
     return `${SUPABASE_URL}/storage/v1/object/public/${bucketInput}/${path}`;
   }
+
   static async uploadFileInChunks(
     file: File,
     onProgress?: (percent: number) => void,
@@ -103,6 +161,9 @@ export class S3UploadService {
     // ROUTE TO AWS S3 if it's the specific AI bucket
     if (bucketName === 'paybue-invoice-estimation' || bucketInput.includes('paybue-invoice-estimation.s3')) {
         console.log("Uploading directly to AWS S3...");
+        if (!s3Client) {
+          throw new Error("Client S3 credentials not configured. Please use secure presigned upload.");
+        }
         try {
             const arrayBuffer = await file.arrayBuffer();
             const command = new PutObjectCommand({
@@ -231,35 +292,36 @@ export class S3UploadService {
         fullPath = path.startsWith(folderPath) ? path : `${folderPath}${path}`;
     }
 
-
     // 1. Try AWS S3
     if (bucketName === 'paybue-invoice-estimation' || path.includes('paybue-invoice-estimation.s3')) {
-      try {
-        const command = new GetObjectCommand({ Bucket: bucketName, Key: fullPath });
-        const response = await s3Client.send(command);
-        if (response.Body) {
-          let blob;
-          if (response.Body instanceof Blob) {
-            blob = response.Body;
-          } else if (typeof (response.Body as any).transformToByteArray === 'function') {
-            const bytes = await (response.Body as any).transformToByteArray();
-            blob = new Blob([bytes]);
-          } else {
-            const reader = (response.Body as any).getReader ? (response.Body as any).getReader() : null;
-            if (reader) {
-              const chunks = [];
-              while (true) {
-                const { done, value } = await reader.read();
-                if (done) break;
-                chunks.push(value);
+      if (s3Client) {
+        try {
+          const command = new GetObjectCommand({ Bucket: bucketName, Key: fullPath });
+          const response = await s3Client.send(command);
+          if (response.Body) {
+            let blob;
+            if (response.Body instanceof Blob) {
+              blob = response.Body;
+            } else if (typeof (response.Body as any).transformToByteArray === 'function') {
+              const bytes = await (response.Body as any).transformToByteArray();
+              blob = new Blob([bytes]);
+            } else {
+              const reader = (response.Body as any).getReader ? (response.Body as any).getReader() : null;
+              if (reader) {
+                const chunks = [];
+                while (true) {
+                  const { done, value } = await reader.read();
+                  if (done) break;
+                  chunks.push(value);
+                }
+                blob = new Blob(chunks);
               }
-              blob = new Blob(chunks);
             }
+            if (blob) return await blobToBase64(blob);
           }
-          if (blob) return await blobToBase64(blob);
+        } catch (error) {
+          console.warn(`[S3Service] AWS S3 fetch failed for ${fullPath}. Error:`, error);
         }
-      } catch (error) {
-        console.warn(`[S3Service] AWS S3 fetch failed for ${fullPath}. Error:`, error);
       }
     }
 

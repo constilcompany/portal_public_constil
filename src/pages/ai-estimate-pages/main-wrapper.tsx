@@ -231,59 +231,23 @@ const CreateProjectWizard = () => {
     setStatusText('Reading and Extracting Blue Print...');
 
     try {
-      const s3Key = await S3UploadService.uploadFileInChunks(file, (pct) => {
-        setProgress(Math.round((pct * 20) / 100));
-      }, 'paybue-invoice-estimation/blueprints');
+      let resolvedJobId = '';
+      let usedSecureFlow = false;
 
-      setCurrentS3Key(s3Key);
-
-      const { data: jobRes } = await axios.post(
-        `${import.meta.env.VITE_SUPABASE_URL}/rest/v1/pdf_jobs`,
-        {
-          userid: userId,
-          pdf_key: s3Key,
-          status: "pending",
-        },
-        {
-          headers: {
-            'Authorization': `Bearer ${token}`,
-            'apikey': import.meta.env.VITE_SUPABASE_ANON_KEY,
-            'Prefer': 'return=representation'
-          }
-        }
-      );
-
-      const newJobId = jobRes?.[0]?.id;
-      if (!newJobId) throw new Error("Failed to create background job");
-
-      const fastApiBase = import.meta.env.DEV 
-        ? '/api-fast' 
-        : (import.meta.env.VITE_FASTAPI_URL || 'https://paybue-quee.hnhsofttechsolutions.com');
-      
-      axios.post(
-        `${fastApiBase}/estimate`,
-        { 
-          job_id: newJobId,
-          pdf_key: s3Key,
-          selected_scopes: projectData.source,
-          project_name: projectData.projectName
-        },
-        { 
-          headers: { 
-            'Content-Type': 'application/json',
-            'Authorization': `Bearer ${token}`,
-            'ngrok-skip-browser-warning': 'true'
-          } 
-        }
-      ).catch((e) => console.warn("Background trigger failed:", e));
-
-      // 💳 Deduct Credit Now
+      // 1. Attempt secure presigned upload via Edge Function (zero client secrets)
       try {
-        await axios.post(
-          `${import.meta.env.VITE_SUPABASE_FUNCTIONS_URL}/user-api/consume-credit`,
+        const presignedResult = await S3UploadService.uploadBlueprintSecure(file, (pct) => {
+          setProgress(Math.round((pct * 20) / 100));
+        });
+        const secureS3Key = presignedResult.pdf_key;
+        setCurrentS3Key(secureS3Key);
+
+        const secureRes = await axios.post(
+          `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/blueprint-estimate/start-estimate`,
           {
-            action_type: 'ai_estimate',
-            reference_id: jobRes[0]?.id || null
+            pdf_key: secureS3Key,
+            selected_scopes: projectData.source,
+            project_name: projectData.projectName
           },
           {
             headers: {
@@ -292,11 +256,85 @@ const CreateProjectWizard = () => {
             }
           }
         );
-      } catch (deductErr) {
-        console.error("Credit deduction failed", deductErr);
+
+        if (secureRes.data?.job_id) {
+          resolvedJobId = secureRes.data.job_id;
+          usedSecureFlow = true;
+        }
+      } catch (secureErr: any) {
+        console.warn('[Secure Flow Fallback]', secureErr?.message);
       }
 
-      setJobId(jobRes[0]?.id);
+      // 2. Fallback to direct client flow if Edge Function is not yet deployed
+      if (!usedSecureFlow) {
+        const s3Key = await S3UploadService.uploadFileInChunks(file, (pct) => {
+          setProgress(Math.round((pct * 20) / 100));
+        }, 'paybue-invoice-estimation/blueprints');
+
+        setCurrentS3Key(s3Key);
+
+        const { data: jobRes } = await axios.post(
+          `${import.meta.env.VITE_SUPABASE_URL}/rest/v1/pdf_jobs`,
+          {
+            userid: userId,
+            pdf_key: s3Key,
+            status: 'pending',
+          },
+          {
+            headers: {
+              'Authorization': `Bearer ${token}`,
+              'apikey': import.meta.env.VITE_SUPABASE_ANON_KEY,
+              'Prefer': 'return=representation'
+            }
+          }
+        );
+
+        const newJobId = jobRes?.[0]?.id;
+        if (!newJobId) throw new Error('Failed to create background job');
+        resolvedJobId = newJobId;
+
+        const fastApiBase = import.meta.env.DEV 
+          ? '/api-fast' 
+          : (import.meta.env.VITE_FASTAPI_URL || 'https://paybue-quee.hnhsofttechsolutions.com');
+        
+        axios.post(
+          `${fastApiBase}/estimate`,
+          { 
+            job_id: newJobId,
+            pdf_key: s3Key,
+            selected_scopes: projectData.source,
+            project_name: projectData.projectName
+          },
+          { 
+            headers: { 
+              'Content-Type': 'application/json',
+              'Authorization': `Bearer ${token}`,
+              'ngrok-skip-browser-warning': 'true'
+            } 
+          }
+        ).catch((e) => console.warn('Background trigger failed:', e));
+
+        // Deduct Credit in fallback flow
+        try {
+          await axios.post(
+            `${import.meta.env.VITE_SUPABASE_FUNCTIONS_URL}/user-api/consume-credit`,
+            {
+              action_type: 'ai_estimate',
+              reference_id: jobRes[0]?.id || null
+            },
+            {
+              headers: {
+                'Authorization': `Bearer ${token}`,
+                'apikey': import.meta.env.VITE_SUPABASE_ANON_KEY
+              }
+            }
+          );
+        } catch (deductErr) {
+          console.error('Credit deduction failed', deductErr);
+        }
+      }
+
+      setJobId(resolvedJobId);
       setJobStage('polling');
 
     } catch (err: any) {
