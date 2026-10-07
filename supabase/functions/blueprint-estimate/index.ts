@@ -1,6 +1,6 @@
 // Supabase Edge Function: blueprint-estimate
-// Secure Blueprint PDF upload, ownership verification, atomic credit transactions,
-// and AI estimation job orchestration for Constil & ChatGPT Plugin.
+// Secure Blueprint/Invoice/Estimate file upload, ownership verification, atomic credit transactions,
+// protected accounting ledger, and AI estimation job orchestration for Constil & ChatGPT Plugin.
 
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 import { S3Client, PutObjectCommand, HeadObjectCommand, GetObjectCommand } from "npm:@aws-sdk/client-s3@3.740.0";
@@ -39,6 +39,8 @@ const ALLOWED_SCOPES = [
   "Siding",
   "General",
 ];
+
+const ALLOWED_UPLOAD_FOLDERS = ["blueprints", "invoices", "estimates", "logos", "signatures"];
 
 function getS3Client(): { s3: S3Client; bucket: string; region: string } {
   const region = Deno.env.get("AWS_REGION") || Deno.env.get("VITE_AWS_REGION") || "us-east-1";
@@ -110,6 +112,7 @@ Deno.serve(async (req) => {
   try {
     // -------------------------------------------------------------------------
     // ENDPOINT 1: CREATE PRESIGNED S3 UPLOAD URL
+    // Supports: blueprints, invoices, estimates, logos, signatures
     // POST /blueprint-estimate/upload-url OR action: "create-upload-url"
     // -------------------------------------------------------------------------
     if (
@@ -121,20 +124,33 @@ Deno.serve(async (req) => {
 
       const filename = String(body.filename || "").trim();
       const fileSize = Number(body.file_size || 0);
-      const contentType = String(body.content_type || "").trim().toLowerCase();
+      const rawContentType = String(body.content_type || "").trim().toLowerCase();
+      const targetFolder = String(body.folder || "blueprints").trim().toLowerCase();
 
-      // Validate Content-Type
-      if (contentType !== "application/pdf") {
+      // Validate Folder
+      if (!ALLOWED_UPLOAD_FOLDERS.includes(targetFolder)) {
         return jsonResponse({
-          error: "Invalid file type. Only PDF documents ('application/pdf') are supported.",
+          error: `Invalid upload folder: '${targetFolder}'. Allowed folders: ${ALLOWED_UPLOAD_FOLDERS.join(", ")}.`,
+          allowed_folders: ALLOWED_UPLOAD_FOLDERS,
         }, 400);
       }
 
-      // Validate Filename extension
-      if (!filename.toLowerCase().endsWith(".pdf")) {
-        return jsonResponse({
-          error: "Invalid filename. File must have a .pdf extension.",
-        }, 400);
+      // Validate Content-Type based on folder
+      let validatedContentType = rawContentType;
+      if (targetFolder === "blueprints" || targetFolder === "invoices" || targetFolder === "estimates") {
+        if (rawContentType !== "application/pdf" && !filename.toLowerCase().endsWith(".pdf")) {
+          return jsonResponse({
+            error: `Invalid file type for ${targetFolder}. Only PDF documents ('application/pdf') are supported.`,
+          }, 400);
+        }
+        validatedContentType = "application/pdf";
+      } else if (targetFolder === "logos" || targetFolder === "signatures") {
+        const allowedImageTypes = ["image/png", "image/jpeg", "image/jpg", "image/webp", "image/svg+xml", "application/pdf"];
+        if (!allowedImageTypes.includes(rawContentType)) {
+          return jsonResponse({
+            error: `Invalid file type for ${targetFolder}. Allowed: ${allowedImageTypes.join(", ")}.`,
+          }, 400);
+        }
       }
 
       // Validate File Size
@@ -151,18 +167,23 @@ Deno.serve(async (req) => {
         }, 400);
       }
 
-      // Generate isolated S3 key scoped strictly to authenticated user's prefix
+      // Extract file extension cleanly
+      const nameParts = filename.split(".");
+      const ext = nameParts.length > 1 ? nameParts.pop()!.toLowerCase().replace(/[^a-z0-9]/g, "") : (validatedContentType.includes("pdf") ? "pdf" : "png");
+
+      // Generate isolated S3 key scoped strictly to authenticated user's prefix: folder/userId/timestamp_rand.ext
       const randomSuffix = crypto.randomUUID().replace(/-/g, "").slice(0, 12);
-      const s3Key = `blueprints/${userId}/${Date.now()}_${randomSuffix}.pdf`;
+      const s3Key = `${targetFolder}/${userId}/${Date.now()}_${randomSuffix}.${ext}`;
 
       const { s3, bucket } = getS3Client();
 
       const putCommand = new PutObjectCommand({
         Bucket: bucket,
         Key: s3Key,
-        ContentType: "application/pdf",
+        ContentType: validatedContentType,
         Metadata: {
           uploaded_by: userId,
+          folder: targetFolder,
           original_filename: encodeURIComponent(filename.slice(0, 100)),
         },
       });
@@ -174,10 +195,12 @@ Deno.serve(async (req) => {
       return jsonResponse({
         success: true,
         upload_url: uploadUrl,
-        pdf_key: s3Key,
+        s3_key: s3Key,
+        pdf_key: s3Key, // backwards compatibility
+        folder: targetFolder,
         method: "PUT",
         required_headers: {
-          "Content-Type": "application/pdf",
+          "Content-Type": validatedContentType,
         },
         expires_in_seconds: PRESIGNED_URL_EXPIRES_IN,
         max_file_size_bytes: MAX_FILE_SIZE,
@@ -281,7 +304,6 @@ Deno.serve(async (req) => {
         }
       } catch (sigErr: any) {
         console.warn("[PDF Signature Check Warning]:", sigErr);
-        // If range read fails due to storage permissions or configuration, report error
         return jsonResponse({ error: "Failed to verify PDF file signature." }, 400);
       }
 
@@ -318,7 +340,7 @@ Deno.serve(async (req) => {
         }, 503);
       }
 
-      // Step 2.7: Atomic Job Creation, Credit Deduction & Idempotency via Database Transaction RPC
+      // Step 2.7: Atomic Job Creation, Credit Deduction & Protected Ledger via Service-Role RPC
       const { data: atomicRes, error: atomicErr } = await serviceClient.rpc(
         "start_pdf_estimation_atomic",
         {
@@ -362,7 +384,7 @@ Deno.serve(async (req) => {
       const jobId = atomicRes.job_id;
       const isRetry = atomicRes.is_retry === true;
 
-      // If this is an idempotent replay of an already-queued or finished job, return immediately without duplicate deduction or worker re-dispatch
+      // If this is an idempotent replay of an already-queued or finished job, return immediately
       if (isRetry) {
         return jsonResponse({
           success: true,
@@ -404,7 +426,7 @@ Deno.serve(async (req) => {
           const errText = await fastApiRes.text();
           console.error(`[FastAPI Worker Rejected ${fastApiRes.status}]:`, errText);
 
-          // Confirmed worker rejection -> Atomic transactional refund
+          // Confirmed worker rejection -> Atomic transactional refund via protected ledger
           await serviceClient.rpc("refund_pdf_estimation_atomic", {
             p_user_id: userId,
             p_job_id: jobId,
@@ -436,30 +458,31 @@ Deno.serve(async (req) => {
         const isTimeout = dispatchErr.name === "AbortError" || dispatchErr.code === 20;
 
         if (isTimeout) {
-          // Worker timeout: NOT confirmed failure!
-          // Worker may have received the payload and queued the task.
-          // Do NOT refund and do NOT mark job failed.
-          console.warn(`[FastAPI Dispatch Timeout]: Awaiting async worker completion for job ${jobId}. Preserving credits.`);
+          // Worker timeout: NOT confirmed failure and NOT confirmed acceptance!
+          // Do NOT claim "task queued" without acknowledgment.
+          // Mark status as 'dispatch_unknown' for reconciliation.
+          console.warn(`[FastAPI Dispatch Timeout]: Awaiting reconciliation for unconfirmed job ${jobId}.`);
           await serviceClient
             .from("pdf_jobs")
             .update({
-              status: "processing",
-              message: "Job dispatched to AI worker; awaiting asynchronous completion.",
+              status: "dispatch_unknown",
+              message: "Worker dispatch timed out without acknowledgment. Worker acceptance unconfirmed.",
             })
             .eq("id", jobId);
 
           return jsonResponse({
             success: true,
             job_id: jobId,
-            status: "processing",
-            message: "Job dispatched to AI worker. The synchronous worker acknowledgment timed out, but the background task is queued. Please poll status.",
+            status: "dispatch_unknown",
+            message: "AI worker dispatch timed out awaiting synchronous acknowledgment. Job state is unconfirmed (dispatch_unknown). Reconciliation or polling required.",
             credits_deducted: atomicRes.credits_deducted,
             remaining_credits: atomicRes.remaining_credits,
-            warning: "DOWNSTREAM_TIMEOUT",
+            warning: "WORKER_DISPATCH_TIMEOUT",
+            reconciliation_required: true,
           }, 202);
         }
 
-        // Connection failure before reaching worker -> Atomic transactional refund
+        // Confirmed network/connection failure before reaching worker -> Atomic transactional refund
         console.error("[FastAPI Connection Error]:", dispatchErr);
         await serviceClient.rpc("refund_pdf_estimation_atomic", {
           p_user_id: userId,

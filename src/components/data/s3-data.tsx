@@ -8,11 +8,12 @@ const DEFAULT_S3_BUCKET = import.meta.env.VITE_AWS_STORAGE_BUCKET_NAME || 'paybu
 /**
  * S3UploadService
  * Secure client-side storage service.
- * NOTE: Client-side AWS secrets have been removed for security compliance.
- * Blueprint PDF uploads use server-generated short-lived presigned S3 URLs via Supabase Edge Function.
+ * NOTE: Client-side AWS credentials have been removed for security compliance.
+ * All AWS S3 uploads (blueprints, invoices, estimates, signatures, logos) use server-generated
+ * short-lived presigned S3 URLs via the authenticated Supabase Edge Function.
  */
 export class S3UploadService {
-  /* ================= SECURE PRESIGNED S3 UPLOAD (ZERO CLIENT SECRETS) ================= */
+  /* ================= SECURE PRESIGNED S3 UPLOAD (BLUEPRINTS) ================= */
   static async uploadBlueprintSecure(
     file: File,
     onProgress?: (percent: number) => void
@@ -27,7 +28,8 @@ export class S3UploadService {
       {
         filename: file.name,
         file_size: file.size,
-        content_type: file.type || "application/pdf"
+        content_type: file.type || "application/pdf",
+        folder: "blueprints"
       },
       {
         headers: {
@@ -38,14 +40,15 @@ export class S3UploadService {
       }
     );
 
-    const { upload_url, pdf_key, required_headers } = res.data;
-    if (!upload_url || !pdf_key) {
+    const { upload_url, pdf_key, s3_key, required_headers } = res.data;
+    const finalKey = pdf_key || s3_key;
+    if (!upload_url || !finalKey) {
       throw new Error(res.data?.error || "Failed to obtain presigned upload URL from server.");
     }
 
     // 2. Direct PUT to S3 using the presigned URL with signed headers
     const putHeaders: Record<string, string> = {
-      'Content-Type': 'application/pdf',
+      'Content-Type': file.type || 'application/pdf',
       ...(required_headers || {})
     };
 
@@ -59,7 +62,110 @@ export class S3UploadService {
       }
     });
 
-    return { pdf_key, upload_url };
+    return { pdf_key: finalKey, upload_url };
+  }
+
+  /* ================= UNIFIED UPLOAD (PRESERVES EXISTING FEATURES VIA PRESIGNED URL) ================= */
+  static async uploadFileInChunks(
+    file: File,
+    onProgress?: (percent: number) => void,
+    targetBucket?: string
+  ): Promise<string> {
+    const token = localStorage.getItem("access_token");
+    const bucketInput = targetBucket || DEFAULT_S3_BUCKET;
+    const parts = bucketInput.split('/');
+    const bucketName = parts[0];
+    const subFolder = parts.length > 1 ? parts.slice(1).join('/') : "";
+
+    // 1. ROUTE TO AWS S3 VIA SECURE SERVER-SIDE PRESIGNED URL
+    if (bucketName === 'paybue-invoice-estimation' || bucketInput.includes('paybue-invoice-estimation')) {
+      if (!token) throw new Error("Authentication required for file upload.");
+
+      // Map subfolder to allowed server folder (invoices, estimates, signatures, logos, blueprints)
+      let folder = "invoices";
+      if (subFolder.includes("estimate")) folder = "estimates";
+      else if (subFolder.includes("signature")) folder = "signatures";
+      else if (subFolder.includes("logo")) folder = "logos";
+      else if (subFolder.includes("blueprint")) folder = "blueprints";
+
+      const contentType = file.type || (file.name.toLowerCase().endsWith(".pdf") ? "application/pdf" : "image/png");
+
+      const edgeFunctionUrl = `${SUPABASE_URL}/functions/v1/blueprint-estimate/upload-url`;
+      const res = await axios.post(
+        edgeFunctionUrl,
+        {
+          filename: file.name,
+          file_size: file.size,
+          content_type: contentType,
+          folder: folder
+        },
+        {
+          headers: {
+            'Authorization': `Bearer ${token}`,
+            'apikey': ANON_KEY,
+            'Content-Type': 'application/json'
+          }
+        }
+      );
+
+      const { upload_url, s3_key, pdf_key, required_headers } = res.data;
+      const finalKey = s3_key || pdf_key;
+      if (!upload_url || !finalKey) {
+        throw new Error(res.data?.error || "Failed to obtain presigned upload URL from server.");
+      }
+
+      const putHeaders: Record<string, string> = {
+        'Content-Type': contentType,
+        ...(required_headers || {})
+      };
+
+      await axios.put(upload_url, file, {
+        headers: putHeaders,
+        onUploadProgress: (progressEvent) => {
+          if (progressEvent.total) {
+            const percentCompleted = Math.round((progressEvent.loaded * 100) / progressEvent.total);
+            onProgress?.(percentCompleted);
+          }
+        }
+      });
+
+      console.log(`[S3Service] Secure presigned upload successful. Key: ${finalKey}`);
+      return finalKey;
+    }
+
+    // 2. ROUTE TO SUPABASE STORAGE FOR NON-AWS BUCKETS (e.g. document-logos)
+    const fileKey = this.generateFileName(file);
+    const internalFolderPath = parts.length > 1 ? parts.slice(1).join('/') + '/' : "";
+    const finalPath = `${internalFolderPath}${fileKey}`;
+
+    try {
+      const encodedPath = finalPath.split('/').map(part => encodeURIComponent(part)).join('/');
+      
+      await axios.post(
+        `${SUPABASE_URL}/storage/v1/object/${bucketName}/${encodedPath}`,
+        file,
+        {
+          headers: {
+            'Authorization': `Bearer ${token}`,
+            'apikey': ANON_KEY,
+            'Content-Type': file.type,
+            'x-upsert': 'true'
+          },
+          onUploadProgress: (progressEvent) => {
+            if (progressEvent.total) {
+              const percentCompleted = Math.round((progressEvent.loaded * 100) / progressEvent.total);
+              onProgress?.(percentCompleted);
+            }
+          }
+        }
+      );
+
+      console.log(`[S3Service] Supabase Storage upload successful. Path: ${finalPath}`);
+      return finalPath;
+    } catch (err: any) {
+      console.error("[S3Service] Supabase upload failed:", err);
+      throw err;
+    }
   }
 
   /* ================= DELETE FILE ================= */
@@ -117,61 +223,6 @@ export class S3UploadService {
         return `${SUPABASE_URL}/storage/v1/object/public/${path}`;
     }
     return `${SUPABASE_URL}/storage/v1/object/public/${bucketInput}/${path}`;
-  }
-
-  static async uploadFileInChunks(
-    file: File,
-    onProgress?: (percent: number) => void,
-    targetBucket?: string
-  ): Promise<string> {
-    const fileKey = this.generateFileName(file);
-    const token = localStorage.getItem("access_token");
-    
-    const bucketInput = targetBucket || DEFAULT_S3_BUCKET;
-    const parts = bucketInput.split('/');
-    const bucketName = parts[0];
-    const internalFolderPath = parts.length > 1 ? parts.slice(1).join('/') + '/' : "";
-    const finalPath = `${internalFolderPath}${fileKey}`;
-
-    // ROUTE TO AWS S3 if it's the specific AI bucket
-    if (bucketName === 'paybue-invoice-estimation' || bucketInput.includes('paybue-invoice-estimation.s3')) {
-        // Direct browser AWS S3 upload is disabled because client secrets are removed
-        throw new Error(
-          "Direct browser AWS S3 upload is disabled for security compliance. " +
-          "For blueprints, please use S3UploadService.uploadBlueprintSecure(). " +
-          "For invoices/signatures/logos, please migrate to presigned server upload or Supabase Storage."
-        );
-    }
-
-    // SUPABASE STORAGE for logos/signatures/profile avatars
-    try {
-      const encodedPath = finalPath.split('/').map(part => encodeURIComponent(part)).join('/');
-      
-      await axios.post(
-        `${SUPABASE_URL}/storage/v1/object/${bucketName}/${encodedPath}`,
-        file,
-        {
-          headers: {
-            'Authorization': `Bearer ${token}`,
-            'apikey': ANON_KEY,
-            'Content-Type': file.type,
-            'x-upsert': 'true'
-          },
-          onUploadProgress: (progressEvent) => {
-            if (progressEvent.total) {
-              const percentCompleted = Math.round((progressEvent.loaded * 100) / progressEvent.total);
-              onProgress?.(percentCompleted);
-            }
-          }
-        }
-      );
-
-      console.log(`Supabase Upload successful. Path: ${finalPath}`);
-      return finalPath;
-    } catch (err: any) {
-      console.error("Supabase upload failed:", err);
-      throw err;
-    }
   }
 
   /* ================= BASE64 UTILS ================= */
