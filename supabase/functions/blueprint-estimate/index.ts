@@ -1,9 +1,9 @@
 // Supabase Edge Function: blueprint-estimate
-// Secure Blueprint PDF upload, ownership verification, server-side credit deduction,
+// Secure Blueprint PDF upload, ownership verification, atomic credit transactions,
 // and AI estimation job orchestration for Constil & ChatGPT Plugin.
 
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
-import { S3Client, PutObjectCommand, HeadObjectCommand } from "npm:@aws-sdk/client-s3@3.740.0";
+import { S3Client, PutObjectCommand, HeadObjectCommand, GetObjectCommand } from "npm:@aws-sdk/client-s3@3.740.0";
 import { getSignedUrl } from "npm:@aws-sdk/s3-request-presigner@3.740.0";
 
 const corsHeaders = {
@@ -19,7 +19,7 @@ const jsonResponse = (data: unknown, status = 200) =>
   });
 
 const MAX_FILE_SIZE = 50 * 1024 * 1024; // 50 MB
-const PRESIGNED_URL_EXPIRES_IN = 900; // 15 minutes
+const PRESIGNED_URL_EXPIRES_IN = 900; // 15 minutes (900 seconds)
 
 const ALLOWED_SCOPES = [
   "Overall",
@@ -61,6 +61,16 @@ function getS3Client(): { s3: S3Client; bucket: string; region: string } {
   return { s3, bucket, region };
 }
 
+async function computePayloadHash(payload: Record<string, unknown>): Promise<string> {
+  const encoder = new TextEncoder();
+  const sortedKeys = Object.keys(payload).sort();
+  const normalized = JSON.stringify(sortedKeys.map((k) => [k, payload[k]]));
+  const hashBuffer = await crypto.subtle.digest("SHA-256", encoder.encode(normalized));
+  return Array.from(new Uint8Array(hashBuffer))
+    .map((b) => b.toString(16).padStart(2, "0"))
+    .join("");
+}
+
 Deno.serve(async (req) => {
   if (req.method === "OPTIONS") {
     return new Response(null, { headers: corsHeaders });
@@ -75,7 +85,7 @@ Deno.serve(async (req) => {
 
   const serviceClient = createClient(supabaseUrl, supabaseServiceKey);
 
-  // 1. Authenticate user from Bearer Token
+  // 1. Authenticate user strictly from Bearer Token (Ignore any client-supplied user_id)
   const authHeader = req.headers.get("Authorization");
   if (!authHeader) {
     return jsonResponse({ error: "Missing Authorization header." }, 401);
@@ -93,7 +103,9 @@ Deno.serve(async (req) => {
 
   const userId = authData.user.id;
   const url = new URL(req.url);
-  const path = url.pathname.replace(/^\/blueprint-estimate\/?/, "").replace(/^\/functions\/v1\/blueprint-estimate\/?/, "");
+  const path = url.pathname
+    .replace(/^\/blueprint-estimate\/?/, "")
+    .replace(/^\/functions\/v1\/blueprint-estimate\/?/, "");
 
   try {
     // -------------------------------------------------------------------------
@@ -114,7 +126,7 @@ Deno.serve(async (req) => {
       // Validate Content-Type
       if (contentType !== "application/pdf") {
         return jsonResponse({
-          error: "Invalid file type. Only PDF files ('application/pdf') are supported.",
+          error: "Invalid file type. Only PDF documents ('application/pdf') are supported.",
         }, 400);
       }
 
@@ -139,8 +151,8 @@ Deno.serve(async (req) => {
         }, 400);
       }
 
-      // Generate secure isolated S3 key scoped to authenticated userId
-      const randomSuffix = crypto.randomUUID().replace(/-/g, "").slice(0, 10);
+      // Generate isolated S3 key scoped strictly to authenticated user's prefix
+      const randomSuffix = crypto.randomUUID().replace(/-/g, "").slice(0, 12);
       const s3Key = `blueprints/${userId}/${Date.now()}_${randomSuffix}.pdf`;
 
       const { s3, bucket } = getS3Client();
@@ -163,9 +175,12 @@ Deno.serve(async (req) => {
         success: true,
         upload_url: uploadUrl,
         pdf_key: s3Key,
-        expires_in: PRESIGNED_URL_EXPIRES_IN,
-        max_file_size: MAX_FILE_SIZE,
-        content_type: "application/pdf",
+        method: "PUT",
+        required_headers: {
+          "Content-Type": "application/pdf",
+        },
+        expires_in_seconds: PRESIGNED_URL_EXPIRES_IN,
+        max_file_size_bytes: MAX_FILE_SIZE,
       });
     }
 
@@ -189,7 +204,7 @@ Deno.serve(async (req) => {
         return jsonResponse({ error: "Missing required field: 'pdf_key'." }, 400);
       }
 
-      // Verify S3 object ownership:
+      // Step 2.1: Strict S3 Object Ownership Verification
       // Object key MUST strictly belong to this user's folder: blueprints/<userId>/...
       const expectedPrefix = `blueprints/${userId}/`;
       if (!rawPdfKey.startsWith(expectedPrefix)) {
@@ -198,16 +213,37 @@ Deno.serve(async (req) => {
         }, 403);
       }
 
-      // Verify object exists in S3 storage
+      // Disallow path traversal attempts
+      if (rawPdfKey.includes("..") || rawPdfKey.includes("//")) {
+        return jsonResponse({ error: "Invalid S3 object key format." }, 400);
+      }
+
+      // Step 2.2: Verify S3 Object Existence, Size, and Content Type
       const { s3, bucket } = getS3Client();
+      let actualSize = 0;
       try {
         const headCmd = new HeadObjectCommand({
           Bucket: bucket,
           Key: rawPdfKey,
         });
         const headRes = await s3.send(headCmd);
-        if (!headRes.ContentLength || headRes.ContentLength <= 0) {
+        actualSize = headRes.ContentLength || 0;
+
+        if (actualSize <= 0) {
           return jsonResponse({ error: "Uploaded blueprint file is empty." }, 400);
+        }
+
+        if (actualSize > MAX_FILE_SIZE) {
+          return jsonResponse({
+            error: `Uploaded blueprint file size (${actualSize} bytes) exceeds maximum limit of ${MAX_FILE_SIZE} bytes (50MB).`,
+            max_file_size_bytes: MAX_FILE_SIZE,
+          }, 400);
+        }
+
+        if (headRes.ContentType && !headRes.ContentType.toLowerCase().includes("pdf")) {
+          return jsonResponse({
+            error: `Uploaded object Content-Type '${headRes.ContentType}' is not a valid PDF.`,
+          }, 400);
         }
       } catch (headErr: any) {
         if (headErr?.name === "NotFound" || headErr?.$metadata?.httpStatusCode === 404) {
@@ -219,7 +255,37 @@ Deno.serve(async (req) => {
         return jsonResponse({ error: "Storage verification failed." }, 500);
       }
 
-      // Validate selected scopes
+      // Step 2.3: Verify Magic Bytes / PDF Signature (%PDF-)
+      try {
+        const getCmd = new GetObjectCommand({
+          Bucket: bucket,
+          Key: rawPdfKey,
+          Range: "bytes=0-7",
+        });
+        const getRes = await s3.send(getCmd);
+        const headerBytes = await getRes.Body?.transformToByteArray();
+
+        const isPdfMagic =
+          headerBytes &&
+          headerBytes.length >= 5 &&
+          headerBytes[0] === 0x25 && // %
+          headerBytes[1] === 0x50 && // P
+          headerBytes[2] === 0x44 && // D
+          headerBytes[3] === 0x46 && // F
+          headerBytes[4] === 0x2d;   // -
+
+        if (!isPdfMagic) {
+          return jsonResponse({
+            error: "Invalid file signature: uploaded file is not a valid PDF document (magic bytes mismatch).",
+          }, 400);
+        }
+      } catch (sigErr: any) {
+        console.warn("[PDF Signature Check Warning]:", sigErr);
+        // If range read fails due to storage permissions or configuration, report error
+        return jsonResponse({ error: "Failed to verify PDF file signature." }, 400);
+      }
+
+      // Step 2.4: Validate Selected Scopes
       let selectedScopes = rawScopes.map((s: any) => String(s).trim());
       if (selectedScopes.length === 0) {
         selectedScopes = ["Overall"];
@@ -234,134 +300,81 @@ Deno.serve(async (req) => {
         }
       }
 
-      // Idempotency check:
-      // Check if an existing active/completed job exists for this (user, pdf_key)
-      const oneHourAgo = new Date(Date.now() - 3600 * 1000).toISOString();
-      const { data: existingJobs } = await serviceClient
-        .from("pdf_jobs")
-        .select("id, status, message, created_at, detail")
-        .eq("userid", userId)
-        .eq("pdf_key", rawPdfKey)
-        .gte("created_at", oneHourAgo)
-        .in("status", ["pending", "processing", "done"])
-        .order("created_at", { ascending: false })
-        .limit(1);
+      // Step 2.5: Compute Normalized Request Payload Hash for Idempotency
+      const payloadHash = await computePayloadHash({
+        pdf_key: rawPdfKey,
+        selected_scopes: [...selectedScopes].sort(),
+        project_name: projectName,
+      });
 
-      if (existingJobs && existingJobs.length > 0) {
-        const existing = existingJobs[0];
+      // Step 2.6: Enforce Downstream Worker Authentication (Fail-Closed)
+      const fastApiUrl = Deno.env.get("FASTAPI_URL") || "https://paybue-quee.hnhsofttechsolutions.com";
+      const fastApiSecret = Deno.env.get("FASTAPI_SHARED_SECRET") || Deno.env.get("FASTAPI_AUTH_TOKEN");
+
+      if (!fastApiSecret) {
+        return jsonResponse({
+          error: "AI estimation worker authentication secret (FASTAPI_SHARED_SECRET) is not configured on the server. Estimation dispatch is blocked to prevent unauthenticated upstream worker execution (fail-closed).",
+          code: "WORKER_AUTH_NOT_CONFIGURED",
+        }, 503);
+      }
+
+      // Step 2.7: Atomic Job Creation, Credit Deduction & Idempotency via Database Transaction RPC
+      const { data: atomicRes, error: atomicErr } = await serviceClient.rpc(
+        "start_pdf_estimation_atomic",
+        {
+          p_user_id: userId,
+          p_pdf_key: rawPdfKey,
+          p_filename: projectName,
+          p_idempotency_key: idempotencyKey,
+          p_payload_hash: payloadHash,
+          p_scopes: selectedScopes,
+          p_plan_name: projectName,
+        }
+      );
+
+      if (atomicErr) {
+        console.error("[start_pdf_estimation_atomic RPC Error]:", atomicErr);
+
+        if (atomicErr.message?.includes("IDEMPOTENCY_PAYLOAD_MISMATCH") || atomicErr.code === "P0001") {
+          return jsonResponse({
+            error: "Conflict: Idempotency key reused with different request payload.",
+            code: "IDEMPOTENCY_PAYLOAD_MISMATCH",
+          }, 409);
+        }
+
+        if (atomicErr.message?.includes("INSUFFICIENT_CREDITS") || atomicErr.code === "P0003") {
+          return jsonResponse({
+            error: "Insufficient credits to perform AI Estimation.",
+            code: "INSUFFICIENT_CREDITS",
+          }, 402);
+        }
+
+        if (atomicErr.message?.includes("ACTION_DISABLED") || atomicErr.code === "P0002") {
+          return jsonResponse({
+            error: "AI Estimate action is currently disabled by administrator.",
+            code: "ACTION_DISABLED",
+          }, 403);
+        }
+
+        return jsonResponse({ error: atomicErr.message || "Failed to initialize estimation job transaction." }, 500);
+      }
+
+      const jobId = atomicRes.job_id;
+      const isRetry = atomicRes.is_retry === true;
+
+      // If this is an idempotent replay of an already-queued or finished job, return immediately without duplicate deduction or worker re-dispatch
+      if (isRetry) {
         return jsonResponse({
           success: true,
-          job_id: existing.id,
-          status: existing.status,
-          message: "Existing active estimation job returned (idempotent retry). No extra credits deducted.",
+          job_id: jobId,
+          status: atomicRes.job_status || "pending",
+          message: "Existing active estimation job returned (idempotent replay). No duplicate credits deducted.",
           is_retry: true,
-          created_at: existing.created_at,
+          credits_deducted: 0,
         });
       }
 
-      // Fetch AI Estimate credit cost from config
-      const { data: actionConfig } = await serviceClient
-        .from("credit_action_config")
-        .select("credit_cost, is_active")
-        .eq("action_type", "ai_estimate")
-        .single();
-
-      const cost = actionConfig?.credit_cost ?? 1;
-      if (actionConfig && !actionConfig.is_active) {
-        return jsonResponse({ error: "AI Estimate action is currently disabled by administrator." }, 403);
-      }
-
-      // Check and consume user credits atomically
-      const { data: wallet } = await serviceClient
-        .from("user_credit_wallets")
-        .select("ai_estimate_remaining, ai_estimate_unlimited")
-        .eq("user_id", userId)
-        .single();
-
-      let deductedFrom = "none";
-      let previousBalance = 0;
-
-      if (wallet) {
-        if (wallet.ai_estimate_unlimited) {
-          deductedFrom = "unlimited";
-        } else if (wallet.ai_estimate_remaining >= cost) {
-          deductedFrom = "wallet";
-          previousBalance = wallet.ai_estimate_remaining;
-          const { error: walletUpdateErr } = await serviceClient
-            .from("user_credit_wallets")
-            .update({ ai_estimate_remaining: previousBalance - cost })
-            .eq("user_id", userId);
-          if (walletUpdateErr) {
-            return jsonResponse({ error: "Failed to update credit wallet." }, 500);
-          }
-        } else {
-          return jsonResponse({
-            error: `Insufficient AI Estimate credits. Required: ${cost}, Available: ${wallet.ai_estimate_remaining}.`,
-            required: cost,
-            available: wallet.ai_estimate_remaining,
-          }, 402);
-        }
-      } else {
-        // Fallback: legacy user_credits table
-        const { data: legacyCredits } = await serviceClient
-          .from("user_credits")
-          .select("balance")
-          .eq("user_id", userId)
-          .single();
-
-        if (!legacyCredits || legacyCredits.balance < cost) {
-          return jsonResponse({
-            error: `Insufficient credits. Required: ${cost}, Available: ${legacyCredits?.balance ?? 0}.`,
-            required: cost,
-            available: legacyCredits?.balance ?? 0,
-          }, 402);
-        }
-
-        deductedFrom = "legacy";
-        previousBalance = legacyCredits.balance;
-        const { error: legacyUpdateErr } = await serviceClient
-          .from("user_credits")
-          .update({ balance: previousBalance - cost })
-          .eq("user_id", userId);
-        if (legacyUpdateErr) {
-          return jsonResponse({ error: "Failed to update legacy credit balance." }, 500);
-        }
-      }
-
-      // Insert record into pdf_jobs
-      const { data: jobInsert, error: jobInsertErr } = await serviceClient
-        .from("pdf_jobs")
-        .insert({
-          userid: userId,
-          user_id: userId,
-          pdf_key: rawPdfKey,
-          filename: projectName,
-          status: "pending",
-          message: "Job submitted and queued for estimation",
-        })
-        .select("id, status, created_at")
-        .single();
-
-      if (jobInsertErr || !jobInsert) {
-        // Rollback credit deduction on job creation failure
-        await rollbackCredits(serviceClient, userId, deductedFrom, previousBalance, cost);
-        console.error("[Job Insert Error]:", jobInsertErr);
-        return jsonResponse({ error: "Failed to initialize background job in database." }, 500);
-      }
-
-      const jobId = jobInsert.id;
-
-      // Log successful consumption transaction
-      await serviceClient.from("credit_transactions").insert({
-        user_id: userId,
-        transaction_type: "consumption",
-        credits_change: deductedFrom === "unlimited" ? 0 : -cost,
-        amount_paid: 0,
-        reference_id: idempotencyKey || jobId,
-      });
-
-      // Trigger FastAPI background estimation service
-      const fastApiUrl = Deno.env.get("FASTAPI_URL") || "https://paybue-quee.hnhsofttechsolutions.com";
+      // Step 2.8: Dispatch to Downstream FastAPI Estimation Worker
       const fastApiPayload = {
         job_id: jobId,
         pdf_key: rawPdfKey,
@@ -369,31 +382,37 @@ Deno.serve(async (req) => {
         project_name: projectName,
       };
 
+      const controller = new AbortController();
+      const timeoutId = setTimeout(() => controller.abort(), 15000); // 15s synchronous dispatch timeout
+
       try {
         const fastApiRes = await fetch(`${fastApiUrl}/estimate`, {
           method: "POST",
           headers: {
             "Content-Type": "application/json",
-            "Authorization": `Bearer ${token}`,
+            "Authorization": `Bearer ${fastApiSecret}`,
+            "X-Internal-Secret": fastApiSecret,
             "ngrok-skip-browser-warning": "true",
           },
           body: JSON.stringify(fastApiPayload),
+          signal: controller.signal,
         });
+
+        clearTimeout(timeoutId);
 
         if (!fastApiRes.ok) {
           const errText = await fastApiRes.text();
-          console.error(`[FastAPI Service Error ${fastApiRes.status}]:`, errText);
+          console.error(`[FastAPI Worker Rejected ${fastApiRes.status}]:`, errText);
 
-          // Mark job as fail and refund credits
-          await serviceClient
-            .from("pdf_jobs")
-            .update({ status: "fail", message: `AI Estimation worker rejected request (${fastApiRes.status})` })
-            .eq("id", jobId);
-
-          await rollbackCredits(serviceClient, userId, deductedFrom, previousBalance, cost, jobId);
+          // Confirmed worker rejection -> Atomic transactional refund
+          await serviceClient.rpc("refund_pdf_estimation_atomic", {
+            p_user_id: userId,
+            p_job_id: jobId,
+            p_reason: `Downstream AI worker rejected task with status ${fastApiRes.status}: ${errText.slice(0, 150)}`,
+          });
 
           return jsonResponse({
-            error: "Downstream AI estimation service rejected the task. Your credits have been refunded.",
+            error: "Downstream AI estimation service rejected the task. Your credits have been transactionally refunded.",
             job_id: jobId,
             status: "fail",
           }, 502);
@@ -409,21 +428,47 @@ Deno.serve(async (req) => {
           pdf_key: rawPdfKey,
           selected_scopes: selectedScopes,
           project_name: projectName,
-          credits_deducted: deductedFrom === "unlimited" ? 0 : cost,
+          credits_deducted: atomicRes.credits_deducted,
+          remaining_credits: atomicRes.remaining_credits,
         });
-      } catch (fastApiConnErr: any) {
-        console.error("[FastAPI Connection Error]:", fastApiConnErr);
+      } catch (dispatchErr: any) {
+        clearTimeout(timeoutId);
+        const isTimeout = dispatchErr.name === "AbortError" || dispatchErr.code === 20;
 
-        // Mark job as fail and refund credits
-        await serviceClient
-          .from("pdf_jobs")
-          .update({ status: "fail", message: "Downstream AI service unreachable." })
-          .eq("id", jobId);
+        if (isTimeout) {
+          // Worker timeout: NOT confirmed failure!
+          // Worker may have received the payload and queued the task.
+          // Do NOT refund and do NOT mark job failed.
+          console.warn(`[FastAPI Dispatch Timeout]: Awaiting async worker completion for job ${jobId}. Preserving credits.`);
+          await serviceClient
+            .from("pdf_jobs")
+            .update({
+              status: "processing",
+              message: "Job dispatched to AI worker; awaiting asynchronous completion.",
+            })
+            .eq("id", jobId);
 
-        await rollbackCredits(serviceClient, userId, deductedFrom, previousBalance, cost, jobId);
+          return jsonResponse({
+            success: true,
+            job_id: jobId,
+            status: "processing",
+            message: "Job dispatched to AI worker. The synchronous worker acknowledgment timed out, but the background task is queued. Please poll status.",
+            credits_deducted: atomicRes.credits_deducted,
+            remaining_credits: atomicRes.remaining_credits,
+            warning: "DOWNSTREAM_TIMEOUT",
+          }, 202);
+        }
+
+        // Connection failure before reaching worker -> Atomic transactional refund
+        console.error("[FastAPI Connection Error]:", dispatchErr);
+        await serviceClient.rpc("refund_pdf_estimation_atomic", {
+          p_user_id: userId,
+          p_job_id: jobId,
+          p_reason: `Downstream AI worker connection failure: ${dispatchErr.message || "Connection refused"}`,
+        });
 
         return jsonResponse({
-          error: "Downstream AI estimation worker is currently unreachable. Your credits have been refunded.",
+          error: "Downstream AI estimation worker is currently unreachable. Your credits have been transactionally refunded.",
           job_id: jobId,
           status: "fail",
         }, 502);
@@ -460,7 +505,7 @@ Deno.serve(async (req) => {
         return jsonResponse({ error: "Job not found." }, 404);
       }
 
-      // Ownership enforcement (Req 7: Only job owner can access)
+      // Strict Ownership Enforcement: Only the job owner can access results
       if (job.userid !== userId && job.user_id !== userId) {
         return jsonResponse({ error: "Job not found or access denied." }, 404);
       }
@@ -486,43 +531,6 @@ Deno.serve(async (req) => {
   }
 });
 
-// Helper to roll back credits on execution failure
-async function rollbackCredits(
-  serviceClient: any,
-  userId: string,
-  deductedFrom: string,
-  previousBalance: number,
-  cost: number,
-  jobId?: string
-) {
-  try {
-    if (deductedFrom === "wallet") {
-      await serviceClient
-        .from("user_credit_wallets")
-        .update({ ai_estimate_remaining: previousBalance })
-        .eq("user_id", userId);
-    } else if (deductedFrom === "legacy") {
-      await serviceClient
-        .from("user_credits")
-        .update({ balance: previousBalance })
-        .eq("user_id", userId);
-    }
-
-    if (deductedFrom === "wallet" || deductedFrom === "legacy") {
-      await serviceClient.from("credit_transactions").insert({
-        user_id: userId,
-        transaction_type: "refund",
-        credits_change: cost,
-        amount_paid: 0,
-        reference_id: jobId ? `refund_${jobId}` : "refund_job_failure",
-      });
-    }
-  } catch (rollbackErr) {
-    console.error("[CRITICAL: Credit Rollback Failed]:", rollbackErr);
-  }
-}
-
-// Helper to peek body without consuming stream if needed
 async function cloneBody(req: Request): Promise<any> {
   try {
     const clone = req.clone();

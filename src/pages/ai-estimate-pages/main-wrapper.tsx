@@ -231,116 +231,50 @@ const CreateProjectWizard = () => {
     setStatusText('Reading and Extracting Blue Print...');
 
     try {
-      let resolvedJobId = '';
-      let usedSecureFlow = false;
+      // 1. Secure presigned upload via Supabase Edge Function (zero client secrets)
+      const presignedResult = await S3UploadService.uploadBlueprintSecure(file, (pct) => {
+        setProgress(Math.round((pct * 20) / 100));
+      });
+      const secureS3Key = presignedResult.pdf_key;
+      setCurrentS3Key(secureS3Key);
 
-      // 1. Attempt secure presigned upload via Edge Function (zero client secrets)
-      try {
-        const presignedResult = await S3UploadService.uploadBlueprintSecure(file, (pct) => {
-          setProgress(Math.round((pct * 20) / 100));
-        });
-        const secureS3Key = presignedResult.pdf_key;
-        setCurrentS3Key(secureS3Key);
+      setProgress(25);
+      setStatusText("Queueing estimation job...");
 
-        const secureRes = await axios.post(
-          `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/blueprint-estimate/start-estimate`,
-          {
-            pdf_key: secureS3Key,
-            selected_scopes: projectData.source,
-            project_name: projectData.projectName
-          },
-          {
-            headers: {
-              'Authorization': `Bearer ${token}`,
-              'apikey': import.meta.env.VITE_SUPABASE_ANON_KEY
-            }
+      // 2. Generate client idempotency key for exactly-once processing
+      const idempotencyKey = crypto.randomUUID();
+
+      // 3. Start AI estimation job with server-side ownership verification & atomic credit deduction
+      const secureRes = await axios.post(
+        `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/blueprint-estimate/start-estimate`,
+        {
+          pdf_key: secureS3Key,
+          selected_scopes: projectData.source,
+          project_name: projectData.projectName,
+          idempotency_key: idempotencyKey,
+        },
+        {
+          headers: {
+            "Authorization": `Bearer ${token}`,
+            "apikey": import.meta.env.VITE_SUPABASE_ANON_KEY,
+            "Content-Type": "application/json",
           }
-        );
-
-        if (secureRes.data?.job_id) {
-          resolvedJobId = secureRes.data.job_id;
-          usedSecureFlow = true;
         }
-      } catch (secureErr: any) {
-        console.warn('[Secure Flow Fallback]', secureErr?.message);
-      }
+      );
 
-      // 2. Fallback to direct client flow if Edge Function is not yet deployed
-      if (!usedSecureFlow) {
-        const s3Key = await S3UploadService.uploadFileInChunks(file, (pct) => {
-          setProgress(Math.round((pct * 20) / 100));
-        }, 'paybue-invoice-estimation/blueprints');
-
-        setCurrentS3Key(s3Key);
-
-        const { data: jobRes } = await axios.post(
-          `${import.meta.env.VITE_SUPABASE_URL}/rest/v1/pdf_jobs`,
-          {
-            userid: userId,
-            pdf_key: s3Key,
-            status: 'pending',
-          },
-          {
-            headers: {
-              'Authorization': `Bearer ${token}`,
-              'apikey': import.meta.env.VITE_SUPABASE_ANON_KEY,
-              'Prefer': 'return=representation'
-            }
-          }
-        );
-
-        const newJobId = jobRes?.[0]?.id;
-        if (!newJobId) throw new Error('Failed to create background job');
-        resolvedJobId = newJobId;
-
-        const fastApiBase = import.meta.env.DEV 
-          ? '/api-fast' 
-          : (import.meta.env.VITE_FASTAPI_URL || 'https://paybue-quee.hnhsofttechsolutions.com');
-        
-        axios.post(
-          `${fastApiBase}/estimate`,
-          { 
-            job_id: newJobId,
-            pdf_key: s3Key,
-            selected_scopes: projectData.source,
-            project_name: projectData.projectName
-          },
-          { 
-            headers: { 
-              'Content-Type': 'application/json',
-              'Authorization': `Bearer ${token}`,
-              'ngrok-skip-browser-warning': 'true'
-            } 
-          }
-        ).catch((e) => console.warn('Background trigger failed:', e));
-
-        // Deduct Credit in fallback flow
-        try {
-          await axios.post(
-            `${import.meta.env.VITE_SUPABASE_FUNCTIONS_URL}/user-api/consume-credit`,
-            {
-              action_type: 'ai_estimate',
-              reference_id: jobRes[0]?.id || null
-            },
-            {
-              headers: {
-                'Authorization': `Bearer ${token}`,
-                'apikey': import.meta.env.VITE_SUPABASE_ANON_KEY
-              }
-            }
-          );
-        } catch (deductErr) {
-          console.error('Credit deduction failed', deductErr);
-        }
+      const resolvedJobId = secureRes.data?.job_id;
+      if (!resolvedJobId) {
+        throw new Error(secureRes.data?.error || "Failed to initialize background estimation job.");
       }
 
       setJobId(resolvedJobId);
-      setJobStage('polling');
+      setJobStage("polling");
 
     } catch (err: any) {
-      console.error(err);
-      toast.error(err?.message || 'Something went wrong');
-      setJobStage('idle');
+      console.error("[AI Estimate Error]", err);
+      const serverMessage = err?.response?.data?.error || err?.message || "Something went wrong";
+      toast.error(serverMessage);
+      setJobStage("idle");
       setUploading(false);
       setTimeout(() => setProgress(0), 800);
     }

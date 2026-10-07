@@ -1,274 +1,235 @@
-# Constil Blueprint Upload & AI Estimation API Contract
+# Constil ChatGPT Plugin: Secure Blueprint Upload & AI Estimation API Contract
 
-## 1. Overview & Architecture
-This API provides a secure, zero-trust mechanism for uploading architectural/engineering blueprint PDFs and generating automated construction cost estimates. It serves both the **ChatGPT Plugin** (via Supabase Native OAuth 2.1 access tokens) and the **Constil Web Portal** (via Supabase Auth JWTs).
+## 1. Overview & Security Architecture
+This specification defines the production integration between the **ChatGPT Plugin**, the **Supabase Edge Function (`blueprint-estimate`)**, **AWS S3 Storage**, and the downstream **FastAPI Estimation Engine**.
 
-```
-[ChatGPT Plugin / Web Portal]
-        |
-        | 1. POST /upload-url (Bearer Token)
-        v
-[Supabase Edge Function: blueprint-estimate]
-        |
-        | 2. Validates JWT, verifies limits, generates S3 presigned URL
-        v
-[Client directly uploads PDF bytes to AWS S3 via Presigned PUT URL]
-        |
-        | 3. POST /start-estimate (Bearer Token, pdf_key, scopes)
-        v
-[Supabase Edge Function: blueprint-estimate]
-        |
-        |-- Verifies S3 object ownership (prefix: blueprints/{user_id}/...)
-        |-- Verifies S3 object existence via HeadObject
-        |-- Validates construction scopes
-        |-- Performs atomic server-side credit check & deduction
-        |-- Inserts job into `pdf_jobs` (status: "pending")
-        |-- Triggers FastAPI `/estimate` background worker (server-to-server)
-        v
-[FastAPI / Celery Estimator Engine] (Processes PDF in background)
-        |
-        | Updates `pdf_jobs` in Supabase (status: "done", detail: { ... })
-        v
-[Client polls: GET /job-status?job_id={job_id}]
-        |
-        v Returns estimate & material takeoff (strictly owner-restricted)
-```
+### Security Guardrails
+1. **Zero Client Secrets**: AWS IAM credentials (`AWS_ACCESS_KEY_ID`, `AWS_SECRET_ACCESS_KEY`) are maintained **exclusively** within server-side secrets in the Supabase environment. No AWS keys exist in the frontend or browser bundle.
+2. **Tenant Isolation**: Uploads are restricted to isolated prefixes:
+   `blueprints/{userId}/{timestamp}_{random}.pdf`.
+   The `userId` is extracted strictly from the validated Supabase JWT token. Client-supplied `user_id` values in request bodies are ignored.
+3. **Multi-layer S3 Validation**:
+   - File extension must be `.pdf`
+   - Object `Content-Length` must be $> 0$ and $\le 52,428,800$ bytes (50 MB)
+   - Object `Content-Type` must be `application/pdf`
+   - Object magic byte signature must match `%PDF-` (`0x25, 0x50, 0x44, 0x46, 0x2D`) via byte-range check
+4. **Atomic Transactions & Idempotency**:
+   - Job creation, credit check, credit deduction, and idempotency tracking execute within a single PostgreSQL stored procedure (`start_pdf_estimation_atomic`) with row-level locking (`FOR UPDATE`).
+   - Duplicate concurrent requests with the same `(user_id, idempotency_key)` and identical payload return the existing job with zero duplicate deduction.
+   - Same `(user_id, idempotency_key)` with differing payloads is rejected with HTTP `409 Conflict`.
+5. **Transactional Incremental Refunds**:
+   - Refunds execute via `refund_pdf_estimation_atomic`, atomically incrementing the wallet balance (`remaining = remaining + cost`). Stale previous balances are never restored.
+   - Exactly-once execution: duplicate refund calls return `already_refunded` without duplicate credits.
+   - Downstream worker request timeouts are **not** treated as confirmed failures; the job remains `processing` to prevent premature refunds while the worker is actively computing.
+6. **Worker Authentication & Fail-Closed Guard**:
+   - If `FASTAPI_SHARED_SECRET` is unset, estimation dispatch fails closed (`503 Service Unavailable`).
 
 ---
 
-## 2. Authentication
-All requests to the Edge Function require a Bearer token in the `Authorization` header:
-```http
-Authorization: Bearer <SUPABASE_ACCESS_TOKEN>
-```
-- **ChatGPT Plugin:** Uses the access token issued by Constil OAuth 2.1 Server (`/oauth/consent`).
-- **Web Portal:** Uses the user's active session JWT from Supabase Auth (`access_token`).
-- **User Identity:** The server dynamically derives the user ID via `supabase.auth.getUser(token)`. The API rejects any user ID passed in request payloads.
+## 2. API Endpoints
 
----
+### 2.1 Request Short-Lived S3 Presigned Upload URL
+Generates an authenticated, short-lived presigned S3 PUT URL for client-side direct upload.
 
-## 3. Endpoints
-
-### 3.1. Request S3 Presigned Upload URL
-Generates a short-lived, pre-signed AWS S3 URL for direct client-to-storage upload. No AWS credentials are ever exposed to the client.
-
-- **Method:** `POST`
-- **Path:** `/functions/v1/blueprint-estimate/upload-url` (or action: `create-upload-url`)
-- **Headers:**
-  - `Authorization: Bearer <TOKEN>`
-  - `Content-Type: application/json`
-
-#### Request Body
-```json
-{
-  "filename": "rumery_lofts_plans.pdf",
-  "file_size": 15728640,
-  "content_type": "application/pdf"
-}
-```
-
-| Field | Type | Required | Description |
-|---|---|---|---|
-| `filename` | string | Yes | Name of the file. Must end with `.pdf`. |
-| `file_size` | number | Yes | File size in bytes. Must be > 0 and <= 52,428,800 (50 MB). |
-| `content_type` | string | Yes | Must be `"application/pdf"`. Other types are rejected. |
-
-#### Response (200 OK)
-```json
-{
-  "success": true,
-  "upload_url": "https://paybue-invoice-estimation.s3.us-east-1.amazonaws.com/blueprints/47f3d024-2cd0-4dc9-b2ef-3a2301618667/1790720000000_a1b2c3d4e5.pdf?X-Amz-Algorithm=...",
-  "pdf_key": "blueprints/47f3d024-2cd0-4dc9-b2ef-3a2301618667/1790720000000_a1b2c3d4e5.pdf",
-  "expires_in": 900,
-  "max_file_size": 52428800,
-  "content_type": "application/pdf"
-}
-```
-
----
-
-### 3.2. Upload File Bytes to S3 (Direct Upload)
-The client sends the binary PDF directly to AWS S3 using standard HTTP `PUT`.
-
-- **Method:** `PUT`
-- **URL:** `<upload_url>` (from step 3.1)
-- **Headers:**
-  - `Content-Type: application/pdf`
-- **Body:** Binary file bytes (`ArrayBuffer` / `Blob` / `File`)
-- **Response:** `200 OK` (from S3)
-
----
-
-### 3.3. Start AI Estimation Job
-Initiates background takeoff generation. The server verifies file ownership in S3, checks and deducts credits, logs the job in `pdf_jobs`, and triggers the worker.
-
-- **Method:** `POST`
-- **Path:** `/functions/v1/blueprint-estimate/start-estimate` (or action: `start-estimate`)
-- **Headers:**
-  - `Authorization: Bearer <TOKEN>`
-  - `Content-Type: application/json`
-
-#### Request Body
-```json
-{
-  "pdf_key": "blueprints/47f3d024-2cd0-4dc9-b2ef-3a2301618667/1790720000000_a1b2c3d4e5.pdf",
-  "selected_scopes": ["Finishes", "Drywall", "Electrical"],
-  "project_name": "Rumery Lofts Tenant Finish-Out",
-  "idempotency_key": "uuid-optional-client-request-id"
-}
-```
-
-| Field | Type | Required | Description |
-|---|---|---|---|
-| `pdf_key` | string | Yes | The key returned from step 3.1. Must match authenticated user's prefix. |
-| `selected_scopes` | array of strings | No | Construction divisions to estimate. Defaults to `["Overall"]`. |
-| `project_name` | string | No | Descriptive project title (max 120 chars). |
-| `idempotency_key` | string | No | Client token for safe retries without duplicate credit consumption. |
-
-#### Allowed `selected_scopes`
-- `Overall`
-- `Finishes`
-- `Drywall`
-- `Flooring`
-- `Framing`
-- `Roofing`
-- `Insulation`
-- `Cleaning`
-- `Plumbing`
-- `HVAC`
-- `Electrical`
-- `FinishCarpentry`
-- `Windows`
-- `Doors`
-- `Siding`
-- `General`
-
-#### Response (200 OK)
-```json
-{
-  "success": true,
-  "job_id": "7f8b9a10-2345-4b67-89ab-cdef01234567",
-  "task_id": "celery-task-uuid-8899",
-  "status": "pending",
-  "pdf_key": "blueprints/47f3d024-2cd0-4dc9-b2ef-3a2301618667/1790720000000_a1b2c3d4e5.pdf",
-  "selected_scopes": ["Finishes", "Drywall", "Electrical"],
-  "project_name": "Rumery Lofts Tenant Finish-Out",
-  "credits_deducted": 1
-}
-```
-
-#### Idempotent Retry Response (200 OK)
-If called again for an already active/completed job:
-```json
-{
-  "success": true,
-  "job_id": "7f8b9a10-2345-4b67-89ab-cdef01234567",
-  "status": "pending",
-  "message": "Existing active estimation job returned (idempotent retry). No extra credits deducted.",
-  "is_retry": true,
-  "created_at": "2026-10-07T21:40:00.000Z"
-}
-```
-
----
-
-### 3.4. Get Estimation Job Status & Results
-Retrieves job progress and the generated material takeoff / cost estimate. Strictly restricted to the job owner.
-
-- **Method:** `GET` (or `POST` with action `get-job-status`)
-- **Path:** `/functions/v1/blueprint-estimate/job-status?job_id=<JOB_UUID>`
-- **Headers:**
-  - `Authorization: Bearer <TOKEN>`
-
-#### Response (While Processing - 200 OK)
-```json
-{
-  "success": true,
-  "job_id": "7f8b9a10-2345-4b67-89ab-cdef01234567",
-  "status": "pending",
-  "message": "Job submitted and queued for estimation",
-  "created_at": "2026-10-07T21:40:00.000Z",
-  "filename": "Rumery Lofts Tenant Finish-Out",
-  "pdf_key": "blueprints/47f3d024-2cd0-4dc9-b2ef-3a2301618667/1790720000000_a1b2c3d4e5.pdf",
-  "detail": null
-}
-```
-
-#### Response (When Complete - 200 OK)
-```json
-{
-  "success": true,
-  "job_id": "7f8b9a10-2345-4b67-89ab-cdef01234567",
-  "status": "done",
-  "message": "Success",
-  "created_at": "2026-10-07T21:40:00.000Z",
-  "filename": "Rumery Lofts Tenant Finish-Out",
-  "pdf_key": "blueprints/47f3d024-2cd0-4dc9-b2ef-3a2301618667/1790720000000_a1b2c3d4e5.pdf",
-  "detail": {
-    "project_data": {
-      "project_name": "Rumery Lofts Tenant Finish-Out",
-      "address": "509 Forest Avenue, Unit #2, Portland, ME 04101"
-    },
-    "takeoff": [
-      {
-        "item_no": "2.01",
-        "csi_code": "09 91 23",
-        "description": "Wall Paint - Interior (2 Coats)",
-        "unit": "SF",
-        "quantity": 10717.55,
-        "total_cost": 21381.51
-      }
-    ],
-    "financial_summary": {
-      "subtotal": 32569.86,
-      "total": 42340.81
-    },
-    "estimate_text": "# ESTIMATE OF MATERIALS AND COST OF CONSTRUCTION..."
+- **URL**: `POST /functions/v1/blueprint-estimate/upload-url`
+- **Headers**:
+  ```http
+  Authorization: Bearer <SUPABASE_USER_JWT>
+  apikey: <SUPABASE_ANON_KEY>
+  Content-Type: application/json
+  ```
+- **Request Body**:
+  ```json
+  {
+    "filename": "architectural_blueprint.pdf",
+    "file_size": 15420300,
+    "content_type": "application/pdf"
   }
-}
-```
+  ```
+- **Response (200 OK)**:
+  ```json
+  {
+    "success": true,
+    "upload_url": "https://paybue-invoice-estimation.s3.us-east-1.amazonaws.com/blueprints/usr_987.../1728345600_a1b2c3d4e5.pdf?AWSAccessKeyId=...&Signature=...",
+    "pdf_key": "blueprints/usr_987.../1728345600_a1b2c3d4e5.pdf",
+    "method": "PUT",
+    "required_headers": {
+      "Content-Type": "application/pdf"
+    },
+    "expires_in_seconds": 900,
+    "max_file_size_bytes": 52428800
+  }
+  ```
+- **Errors**:
+  - `400 Bad Request`: Invalid file extension, non-PDF content type, or file size $> 50$ MB.
+  - `401 Unauthorized`: Missing or invalid Bearer token.
 
 ---
 
-## 4. Error Handling & HTTP Status Codes
+### 2.2 Upload Blueprint File to S3
+Direct HTTP PUT to the presigned URL returned from 2.1.
 
-| Status Code | Code / Meaning | Reason |
-|---|---|---|
-| **400 Bad Request** | `Invalid file type` / `Missing field` | Non-PDF file, file size <= 0 or > 50MB, invalid construction scope, or file not found in storage. |
-| **401 Unauthorized** | `Unauthorized` | Missing or invalid Supabase Bearer token. |
-| **402 Payment Required**| `Insufficient credits` | User credit balance or wallet has insufficient `ai_estimate` credits. |
-| **403 Forbidden** | `Access denied` | Attempted to submit a `pdf_key` outside the authenticated user's prefix. |
-| **404 Not Found** | `Job not found` | Job does not exist, or belongs to another user (owner isolation). |
-| **502 Bad Gateway** | `Downstream worker error` | FastAPI background service unreachable or returned error. **Deducted credits are automatically refunded.** |
-| **500 Server Error** | `Internal error` | Database or AWS S3 service failure. |
-
----
-
-## 5. Security Invariants
-1. **User Storage Isolation:** Object keys are formatted as `blueprints/{user_id}/{timestamp}_{random}.pdf`. User A cannot read, start estimates on, or claim files in User B's folder.
-2. **Token Bound Identity:** User ID is extracted exclusively from the validated JWT claims.
-3. **Short-Lived URLs:** Presigned PUT URLs expire in 15 minutes (900 seconds).
-4. **Zero Client Secrets:** No AWS IAM access keys or secrets are stored in client bundles or browser code.
-5. **Atomic Credit Transactions:** Credits are checked and deducted server-side before job execution; if the downstream pipeline fails to schedule, credits are rolled back atomically with audit records in `credit_transactions`.
+- **URL**: `<upload_url>`
+- **Method**: `PUT`
+- **Headers**:
+  ```http
+  Content-Type: application/pdf
+  ```
+- **Body**: Binary PDF content
+- **Response (200 OK)**: Empty body with `ETag` header.
 
 ---
 
-## 6. Required Server Secrets (Names Only)
-Configure in Supabase Edge Functions (`supabase secrets set`):
+### 2.3 Start AI Estimation Job
+Verifies S3 object ownership, size, and `%PDF-` signature; atomically checks and deducts credits; registers job and idempotency record; and dispatches to FastAPI.
 
-| Secret Name | Purpose |
-|---|---|
-| `SUPABASE_URL` | Supabase API URL (automatic in Edge Functions) |
-| `SUPABASE_SERVICE_ROLE_KEY` | Admin client for table operations & user verification |
-| `AWS_ACCESS_KEY_ID` | AWS IAM Access Key ID for S3 operations |
-| `AWS_SECRET_ACCESS_KEY` | AWS IAM Secret Access Key for S3 operations |
-| `AWS_REGION` | AWS S3 Region (e.g. `us-east-1`) |
-| `AWS_STORAGE_BUCKET_NAME` | AWS S3 Bucket Name (`paybue-invoice-estimation`) |
-| `FASTAPI_URL` | Base URL for FastAPI estimation engine (`https://paybue-quee.hnhsofttechsolutions.com`) |
+- **URL**: `POST /functions/v1/blueprint-estimate/start-estimate`
+- **Headers**:
+  ```http
+  Authorization: Bearer <SUPABASE_USER_JWT>
+  apikey: <SUPABASE_ANON_KEY>
+  Content-Type: application/json
+  ```
+- **Request Body**:
+  ```json
+  {
+    "pdf_key": "blueprints/usr_987.../1728345600_a1b2c3d4e5.pdf",
+    "project_name": "Commercial Plaza Phase 1",
+    "selected_scopes": ["Drywall", "Flooring", "Electrical"],
+    "idempotency_key": "chatgpt_req_89f02c61-34a1-4322-9214-41bdf0"
+  }
+  ```
+- **Allowed `selected_scopes`**:
+  `["Overall", "Finishes", "Drywall", "Flooring", "Framing", "Roofing", "Insulation", "Cleaning", "Plumbing", "HVAC", "Electrical", "FinishCarpentry", "Windows", "Doors", "Siding", "General"]`
+  *(Defaults to `["Overall"]` if omitted).*
+
+- **Response (200 OK - Job Created)**:
+  ```json
+  {
+    "success": true,
+    "job_id": "c8a4192b-8a1e-453f-91df-c0b7ec55a901",
+    "task_id": "fastapi_task_90812",
+    "status": "pending",
+    "pdf_key": "blueprints/usr_987.../1728345600_a1b2c3d4e5.pdf",
+    "selected_scopes": ["Drywall", "Flooring", "Electrical"],
+    "project_name": "Commercial Plaza Phase 1",
+    "credits_deducted": 3,
+    "remaining_credits": 27
+  }
+  ```
+- **Response (200 OK - Idempotent Replay)**:
+  ```json
+  {
+    "success": true,
+    "job_id": "c8a4192b-8a1e-453f-91df-c0b7ec55a901",
+    "status": "pending",
+    "message": "Existing active estimation job returned (idempotent replay). No duplicate credits deducted.",
+    "is_retry": true,
+    "credits_deducted": 0
+  }
+  ```
+- **Response (202 Accepted - Worker Timeout / Async Enqueued)**:
+  ```json
+  {
+    "success": true,
+    "job_id": "c8a4192b-8a1e-453f-91df-c0b7ec55a901",
+    "status": "processing",
+    "message": "Job dispatched to AI worker. The synchronous worker acknowledgment timed out, but the background task is queued. Please poll status.",
+    "credits_deducted": 3,
+    "warning": "DOWNSTREAM_TIMEOUT"
+  }
+  ```
+- **Errors**:
+  - `400 Bad Request`: Invalid S3 key format, non-PDF signature, file size $> 50$ MB, or unallowed scope.
+  - `402 Payment Required`: Insufficient AI estimate credits in wallet.
+  - `403 Forbidden`: `pdf_key` does not match authenticated user prefix (`blueprints/{userId}/`).
+  - `409 Conflict`: `idempotency_key` reused with different request payload.
+  - `502 Bad Gateway`: Downstream worker confirmed rejection (credits atomically refunded).
+  - `503 Service Unavailable`: `FASTAPI_SHARED_SECRET` not configured (fail-closed).
 
 ---
 
-## 7. Architectural Security Advisory (FastAPI Worker)
-- **Finding:** The external FastAPI service (`https://paybue-quee.hnhsofttechsolutions.com/estimate`) currently does **not** enforce an incoming authentication header (API Key, HMAC, or mTLS).
-- **Mitigation implemented:** The Supabase Edge Function serves as the secure public gateway. The client (ChatGPT plugin or browser) only interacts with the authenticated Supabase Edge Function; the FastAPI URL is kept server-side.
-- **Recommended Action for Backend Team:** Add a shared secret header or mutual API key (e.g. `X-Internal-API-Key`) to the FastAPI container to reject any direct requests not originating from the Supabase Edge Function.
+### 2.4 Get Estimation Job Status & Results
+Polls progress and retrieves completed estimate JSON. Access is restricted strictly to the job owner.
+
+- **URL**: `GET /functions/v1/blueprint-estimate/job-status?job_id=<job_id>`
+- **Headers**:
+  ```http
+  Authorization: Bearer <SUPABASE_USER_JWT>
+  apikey: <SUPABASE_ANON_KEY>
+  ```
+- **Response (200 OK - Processing)**:
+  ```json
+  {
+    "success": true,
+    "job_id": "c8a4192b-8a1e-453f-91df-c0b7ec55a901",
+    "status": "processing",
+    "message": "Analyzing architectural floor plans and takeoff quantities...",
+    "created_at": "2026-10-07T21:40:00Z",
+    "filename": "Commercial Plaza Phase 1",
+    "pdf_key": "blueprints/usr_987.../1728345600_a1b2c3d4e5.pdf",
+    "detail": null
+  }
+  ```
+- **Response (200 OK - Completed)**:
+  ```json
+  {
+    "success": true,
+    "job_id": "c8a4192b-8a1e-453f-91df-c0b7ec55a901",
+    "status": "done",
+    "message": "Estimation complete",
+    "created_at": "2026-10-07T21:40:00Z",
+    "filename": "Commercial Plaza Phase 1",
+    "pdf_key": "blueprints/usr_987.../1728345600_a1b2c3d4e5.pdf",
+    "detail": {
+      "items": [
+        {
+          "scope": "Drywall",
+          "description": "5/8 in Type X Drywall",
+          "quantity": 1420,
+          "unit": "sq ft",
+          "unit_cost": 2.85,
+          "total_cost": 4047.00
+        }
+      ],
+      "total_estimate": 4047.00
+    }
+  }
+  ```
+- **Errors**:
+  - `404 Not Found`: Job does not exist or belongs to another user (never leaks job presence).
+
+---
+
+## 3. Required Server Secrets (Supabase Vault / Edge Secrets)
+
+| Secret Name | Purpose | Production Status |
+| :--- | :--- | :--- |
+| `SUPABASE_URL` | Supabase API URL | Configured in Supabase |
+| `SUPABASE_SERVICE_ROLE_KEY` | Admin client for RPC and table operations | Configured in Supabase |
+| `AWS_ACCESS_KEY_ID` | Server-side IAM access key for S3 presigning | Configured in Supabase |
+| `AWS_SECRET_ACCESS_KEY` | Server-side IAM secret for S3 presigning | Configured in Supabase |
+| `AWS_REGION` | S3 bucket region (default: `us-east-1`) | Configured in Supabase |
+| `AWS_STORAGE_BUCKET_NAME` | S3 bucket name (default: `paybue-invoice-estimation`) | Configured in Supabase |
+| `FASTAPI_URL` | Upstream AI engine endpoint (`https://paybue-quee.hnhsofttechsolutions.com`) | Configured in Supabase |
+| `FASTAPI_SHARED_SECRET` | Shared secret token for worker inbound auth | **Active Blocker (Must be set)** |
+
+> **Security Rule**: Secret values must never be output, committed to git, or sent to browser clients.
+
+---
+
+## 4. Frontend S3 Migration Requirements
+
+Client-side direct AWS SDK credentials have been completely removed from `src/components/data/s3-data.tsx`.
+Existing non-blueprint features that previously uploaded directly to `paybue-invoice-estimation` must be migrated:
+
+1. **Invoices**:
+   - `src/components/formnewinvoice/forminvoice.tsx`
+   - `src/components/modal/invoice-template-modal.tsx`
+   - *Migration*: Route PDF upload through a presigned endpoint or upload to Supabase Storage bucket `invoices`.
+2. **Estimate PDF Exports**:
+   - `src/components/modal/estimate-template-modal.tsx`
+   - `src/pages/ai-estimate-pages/File.tsx`
+   - *Migration*: Route PDF export upload through presigned endpoint or Supabase Storage bucket `estimates`.
+3. **Logos & Signatures**:
+   - Already support Supabase Storage (`document-logos`), no AWS secrets required.
