@@ -5,6 +5,7 @@ import { Products } from '../pages/products';
 import { NewProduct } from '../pages/products/newproduct/newproct';
 import { ForgotPassword } from '../pages/auth/forgot-password';
 import { Login } from '../pages/auth/login';
+import { OAuthConsent } from '../pages/auth/oauth-consent';
 import { ResetPassword } from '../pages/auth/reset-password';
 import { ResetSent } from '../pages/auth/reset-sent';
 import { VerifyOtp } from '../pages/auth/verify-otp';
@@ -52,6 +53,7 @@ import AutomatedSequences from '../pages/automated-sequences';
 export function Router() {
   return (
     <Routes>
+      <Route path="/oauth/consent" element={<OAuthConsent />} />
       <Route path="/" element={<UnauthenticatedRoute children={<Login />} />} />
       <Route path="/signup" element={<UnauthenticatedRoute children={<Singup />} />} />
 

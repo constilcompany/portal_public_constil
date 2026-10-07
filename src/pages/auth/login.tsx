@@ -10,7 +10,8 @@ import { useState } from 'react';
 import { loginWithEmailAndPassword, loginWithGoogle } from '../../services/auth-service';
 import { setToken, setUser } from '../../redux/authSlice';
 import { useDispatch } from 'react-redux';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useLocation } from 'react-router-dom';
+import { oauthReturnPath } from './oauth-return';
 import {
   AuthPageLayout,
   AuthPageHeader,
@@ -28,6 +29,7 @@ type LoginFormValues = {
 export function Login() {
   const dispatch = useDispatch();
   const navigate = useNavigate();
+  const location = useLocation();
   const [showPassword, setShowPassword] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
   const togglePasswordVisibility = () => setShowPassword((prev) => !prev);
@@ -44,7 +46,7 @@ export function Login() {
       dispatch(setUser(data.user));
 
       toast.success('Google Login Successful!');
-      navigate('/home');
+      navigate(oauthReturnPath(location.search));
     } catch (error: any) {
       toast.error(error.message || 'Google login failed');
     } finally {
@@ -73,7 +75,7 @@ export function Login() {
         dispatch(setUser(data.user));
 
         toast.success(data.message || 'Login successful');
-        navigate('/home');
+        navigate(oauthReturnPath(location.search));
       } catch (err: any) {
         toast.error(err.message || 'Login failed');
       } finally {
