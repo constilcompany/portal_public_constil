@@ -178,7 +178,7 @@ const SubscriptionModal = ({ open, onClose }: SubscriptionModalProps) => {
     });
 
   // ───────── Price Display ─────────
-  const displayPrice = couponResult?.discounted_price ?? selectedPackage?.price;
+  const displayPrice = couponResult?.price_preview?.final_price ?? selectedPackage?.price;
   const hasDiscount = couponResult?.valid && couponResult?.discount_percent > 0;
 
   return (
@@ -361,8 +361,8 @@ const SubscriptionModal = ({ open, onClose }: SubscriptionModalProps) => {
                         ✓ Coupon applied! {couponResult.discount_percent}% off
                       </p>
                       <div className="flex justify-between text-xs mt-1">
-                        <span className="text-gray-500">Original: <span className="line-through">${couponResult.original_price}</span></span>
-                        <span className="text-green-700 font-bold">Now: ${couponResult.discounted_price}</span>
+                        <span className="text-gray-500">Original: <span className="line-through">${couponResult.price_preview?.original_price}</span></span>
+                        <span className="text-green-700 font-bold">Now: ${couponResult.price_preview?.final_price}</span>
                       </div>
                       {couponResult.influencer_name && (
                         <p className="text-xs text-gray-400 mt-1">via {couponResult.influencer_name}</p>
@@ -393,7 +393,7 @@ const SubscriptionModal = ({ open, onClose }: SubscriptionModalProps) => {
                   <>
                     <div className="flex justify-between text-sm">
                       <span className="text-gray-500">Original Price:</span>
-                      <span className="text-gray-400 line-through">${couponResult.original_price} USD</span>
+                      <span className="text-gray-400 line-through">${couponResult.price_preview?.original_price} USD</span>
                     </div>
                     <div className="flex justify-between text-sm">
                       <span className="text-gray-500">Discount:</span>
