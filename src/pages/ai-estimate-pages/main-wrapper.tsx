@@ -93,6 +93,19 @@ const CreateProjectWizard = () => {
 
   const [jobId, setJobId] = useState<string | null>(null);
   const [currentS3Key, setCurrentS3Key] = useState<string | null>(null);
+  const [submissionSession, setSubmissionSession] = useState<{
+    fileRef: File;
+    pdfKey: string;
+    idempotencyKey: string;
+    jobId?: string;
+  } | null>(null);
+
+  useEffect(() => {
+    const currentFile = projectData.files[0];
+    if (submissionSession && submissionSession.fileRef !== currentFile) {
+      setSubmissionSession(null);
+    }
+  }, [projectData.files, submissionSession]);
 
   useEffect(() => {
     if (jobStage !== 'polling') return;
@@ -202,6 +215,7 @@ const CreateProjectWizard = () => {
         setUploading(false);
         setJobId(null);
         setCurrentS3Key(null);
+        setSubmissionSession(null);
         setTimeout(() => setProgress(0), 800);
       }
     },
@@ -211,7 +225,7 @@ const CreateProjectWizard = () => {
       toast.error(msg);
       setUploading(false);
       setJobId(null);
-      setCurrentS3Key(null);
+      // Retain submissionSession so retry can recover the existing job without re-uploading or re-charging
       setTimeout(() => setProgress(0), 800);
     }
   );
@@ -220,7 +234,12 @@ const CreateProjectWizard = () => {
     const file = projectData.files[0];
     if (!file) { toast.error('Please upload PDF first'); return; }
     if (!token) { toast.error('Token not found. Please login again.'); return; }
-    if (!(packages?.ai_estimate_remaining >= aiCost)) {
+    // Server-side accounting is authoritative; allow ai_estimate_unlimited accounts
+    const hasEnoughCredits = Boolean(
+      packages?.ai_estimate_unlimited ||
+      (packages?.ai_estimate_remaining != null && packages.ai_estimate_remaining >= aiCost)
+    );
+    if (!hasEnoughCredits) {
       toast.error(`Not enough credits. AI Estimates require ${aiCost} credits.`);
       return;
     }
@@ -232,17 +251,53 @@ const CreateProjectWizard = () => {
 
     try {
       // 1. Secure presigned upload via Supabase Edge Function (zero client secrets)
-      const presignedResult = await S3UploadService.uploadBlueprintSecure(file, (pct) => {
+      let secureS3Key = submissionSession?.fileRef === file ? submissionSession?.pdfKey : null;
+      let idempotencyKey = submissionSession?.fileRef === file ? submissionSession?.idempotencyKey : null;
+      if (!secureS3Key || !idempotencyKey) {
+        const presignedResult = await S3UploadService.uploadBlueprintSecure(file, (pct) => {
         setProgress(Math.round((pct * 20) / 100));
       });
-      const secureS3Key = presignedResult.pdf_key;
+      secureS3Key = presignedResult.pdf_key;
       setCurrentS3Key(secureS3Key);
+        idempotencyKey = crypto.randomUUID();
+        setSubmissionSession({
+          fileRef: file,
+          pdfKey: secureS3Key,
+          idempotencyKey: idempotencyKey,
+        });
+      } else {
+        setProgress(20);
+        setStatusText("Re-submitting estimation job with existing upload...");
+      }
+
+      // Recover existing job if available from prior submission of this logical session
+      if (submissionSession?.fileRef === file && submissionSession?.jobId) {
+        try {
+          const statusRes = await axios.get(
+            `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/blueprint-estimate/job-status?job_id=${submissionSession.jobId}`,
+            {
+              headers: {
+                "Authorization": `Bearer ${token}`,
+                "apikey": import.meta.env.VITE_SUPABASE_ANON_KEY,
+              }
+            }
+          );
+          if (statusRes.data?.success && statusRes.data?.status !== 'fail') {
+            setJobId(submissionSession.jobId);
+            setCurrentS3Key(submissionSession.pdfKey);
+            setJobStage("polling");
+            setStatusText(statusRes.data?.status === 'done' ? "Retrieving completed estimate..." : "Recovered existing job, waiting for worker...");
+            return;
+          }
+        } catch (recoverErr) {
+          console.warn("[Job Recovery] Could not recover by jobId, proceeding to idempotent submission", recoverErr);
+        }
+      }
 
       setProgress(25);
       setStatusText("Queueing estimation job...");
 
       // 2. Generate client idempotency key for exactly-once processing
-      const idempotencyKey = crypto.randomUUID();
 
       // 3. Start AI estimation job with server-side ownership verification & atomic credit deduction
       const secureRes = await axios.post(
@@ -267,7 +322,11 @@ const CreateProjectWizard = () => {
         throw new Error(secureRes.data?.error || "Failed to initialize background estimation job.");
       }
 
+      setSubmissionSession(prev => prev ? { ...prev, jobId: resolvedJobId } : null);
       setJobId(resolvedJobId);
+      if (secureRes.status === 202 || secureRes.data?.status === 'dispatch_unknown') {
+        setStatusText("Verifying worker queue acceptance...");
+      }
       setJobStage("polling");
 
     } catch (err: any) {

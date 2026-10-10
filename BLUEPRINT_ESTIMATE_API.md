@@ -228,3 +228,108 @@ Polls progress and retrieves completed estimate JSON. Access is restricted stric
 | `AWS_STORAGE_BUCKET_NAME` | S3 bucket name (default: `paybue-invoice-estimation`) | Configured in Supabase |
 | `FASTAPI_URL` | Upstream AI engine endpoint (`https://paybue-quee.hnhsofttechsolutions.com`) | Configured in Supabase |
 | `FASTAPI_SHARED_SECRET` | Shared secret token for worker inbound auth | **Active Blocker (Must be set)** |
+
+---
+
+## 4. Proposal / Quote & Reconciliation Endpoints
+
+### 4.1 Proxy Quote / Proposal Generation
+Proxies proposal and quotation generation securely from the portal to the backend AI worker with authenticated service credentials.
+
+- **URL**: `POST /functions/v1/blueprint-estimate/quote`
+- **Headers**:
+  ```http
+  Authorization: Bearer <SUPABASE_USER_JWT>
+  apikey: <SUPABASE_ANON_KEY>
+  Content-Type: application/json
+  ```
+- **Request Body**:
+  ```json
+  {
+    "status": true,
+    "estimate_text": "...",
+    "tables_json": { "tables": [...] },
+    "email": "client@example.com",
+    "logo": "https://...",
+    "contractor_signature": "https://...",
+    "client_signature": "https://..."
+  }
+  ```
+- **Response (200 OK)**:
+  ```json
+  {
+    "proposal": {
+      "data": { ... }
+    }
+  }
+  ```
+
+### 4.2 Reconcile Unconfirmed Jobs (`dispatch_unknown`)
+Reconciles jobs whose worker dispatch timed out without acknowledgment. Instead of prematurely refunding on a timeout, the gateway queries the worker's durable idempotency store:
+- If worker accepted: Job status is updated to `pending` (or `done`), preserving user credits.
+- If worker confirmed never received: Atomic transactional refund is issued via protected ledger and job status is marked `fail`.
+- If worker is unreachable: Job status remains `dispatch_unknown` (no premature refund).
+
+- **URL**: `GET /functions/v1/blueprint-estimate/reconcile?job_id=<UUID>` or `POST /functions/v1/blueprint-estimate/reconcile`
+- **Headers**:
+  ```http
+  Authorization: Bearer <SUPABASE_USER_JWT>
+  apikey: <SUPABASE_ANON_KEY>
+  ```
+- **Response (200 OK - Accepted)**:
+  ```json
+  {
+    "success": true,
+    "job_id": "c8a4192b-8a1e-453f-91df-c0b7ec55a901",
+    "task_id": "task_celery_123",
+    "status": "pending",
+    "reconciled": true,
+    "message": "Worker accepted and confirmed task execution."
+  }
+  ```
+- **Response (200 OK - Confirmed Not Received & Refunded)**:
+  ```json
+  {
+    "success": true,
+    "job_id": "c8a4192b-8a1e-453f-91df-c0b7ec55a901",
+    "status": "fail",
+    "refunded": true,
+    "reconciled": true,
+    "message": "Worker confirmed task was not queued. Credits refunded."
+  }
+  ```
+
+---
+
+## 5. FastAPI Backend Engine Contract (`backend/main.py`)
+
+The standalone FastAPI worker service exposes the following endpoints with constant-time server-to-server authentication:
+
+| Endpoint | Method | Authentication | Description |
+| :--- | :--- | :--- | :--- |
+| `/health` | `GET` | **Public** | Liveness check (status: "ok") |
+| `/estimate` | `POST` | `Authorization: Bearer <FASTAPI_SHARED_SECRET>` or `X-Internal-Secret` | Start blueprint estimation (durable idempotency enforced) |
+| `/estimate/status/{task_id}` | `GET` | `Authorization: Bearer <FASTAPI_SHARED_SECRET>` or `X-Internal-Secret` | Query Celery task execution status |
+| `/estimate/reconcile/{job_id}` | `GET` | `Authorization: Bearer <FASTAPI_SHARED_SECRET>` or `X-Internal-Secret` | Verify worker acceptance & execution state |
+| `/quote` | `POST` | `Authorization: Bearer <FASTAPI_SHARED_SECRET>` or `X-Internal-Secret` | Generate structured proposal from invoice data |
+
+### Backend Security Guarantees
+1. **Constant-time Secret Verification**: Evaluated using `hmac.compare_digest` to eliminate timing side-channel attacks. Secrets are never logged.
+2. **Fail-Closed Gate**: If `FASTAPI_SHARED_SECRET` environment variable is unset or empty, all protected endpoints immediately reject with HTTP `503 Service Unavailable`.
+3. **Durable Idempotency Engine**: Backed by SQLite/persistence (`job_idempotency`), thread-safe, SHA-256 normalized payload comparison. Concurrent retries return the registered Celery `task_id` with 0 duplicate Celery dispatches. Same `job_id` with altered payload yields HTTP `409 Conflict`.
+4. **Strict S3 Key & Scope Whitelisting**: S3 keys must match strict folder patterns (`blueprints/*`, `invoices/*`, `estimates/*`) with no directory traversal (`..` or `//`). Scopes must match `ALLOWED_SCOPES`.
+
+### 5.1 Transactional Outbox & Worker Deduplication Specifications
+- **Outbox States**:
+  - `PENDING_DISPATCH`: Initial registration in persistent store. Registration alone is **NOT** worker acceptance.
+  - `DISPATCHED`: Celery broker publish confirmed. Task ID acknowledged.
+  - `DISPATCH_FAILED`: Broker connection refused / down. Returns HTTP `502 Bad Gateway` (never claims PENDING or success).
+  - `DISPATCH_UNCERTAIN`: Broker publish timed out. Returns HTTP `504 Gateway Timeout`.
+  - `EXECUTING` / `COMPLETED`: Worker-side state.
+- **Worker Execution Deduplication**:
+  - In `backend/tasks.py`, `idempotency_store.claim_worker_execution(job_id)` guarantees that even if a message is duplicated or redelivered by Celery, the actual heavy AI processing executes **exactly once**.
+- **Crash Recovery & Reconciliation**:
+  - `GET /estimate/reconcile/{job_id}`: Evaluates actual outbox state and Celery broker receipt. Returns `accepted: false` if in `PENDING_DISPATCH`, `DISPATCH_FAILED`, or `DISPATCH_UNCERTAIN`. Returns `accepted: true` only when queue publish is confirmed.
+  - `POST /estimate/recover-outbox`: Background or on-demand sweep that finds crashed / unconfirmed dispatches and publishes them to the queue broker.
+- **Multi-Replica Deployment (`DATABASE_URL`)**:
+  - For multi-replica container environments, configure `DATABASE_URL` to point to a shared PostgreSQL instance (e.g. Supabase or RDS) so that all replicas share the exact same outbox and idempotency records with row-level locking (`FOR UPDATE`).

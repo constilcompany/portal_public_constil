@@ -1067,11 +1067,15 @@ ${proposalPricingText}
         client_signature: clientSignatureUrl
       };
 
-      // 1. Send to audit quote API
-      const response = await fetch('https://paybue-quee.hnhsofttechsolutions.com/quote', {
+      // 1. Send to audit quote API via secure gateway
+      const gatewayQuoteUrl = `${import.meta.env.VITE_SUPABASE_URL || 'https://xwaxvkmqqgmpuivylhym.supabase.co'}/functions/v1/blueprint-estimate/quote`;
+      const quoteToken = authToken || localStorage.getItem('access_token');
+      const response = await fetch(gatewayQuoteUrl, {
         method: 'POST',
         headers: {
-          'Content-Type': 'application/json'
+          'Content-Type': 'application/json',
+          'apikey': import.meta.env.VITE_SUPABASE_ANON_KEY || '',
+          ...(quoteToken ? { 'Authorization': `Bearer ${quoteToken}` } : {})
         },
         body: JSON.stringify(payload)
       });
@@ -1721,11 +1725,15 @@ ${proposalPricingText}
                           };
                         }
 
-                        // Make API call to fetch proposal template data
-                        const response = await fetch('https://paybue-quee.hnhsofttechsolutions.com/quote', {
+                        // Make API call to fetch proposal template data via secure gateway
+                        const gatewayQuoteUrl = `${import.meta.env.VITE_SUPABASE_URL || 'https://xwaxvkmqqgmpuivylhym.supabase.co'}/functions/v1/blueprint-estimate/quote`;
+                        const quoteToken = authToken || localStorage.getItem('access_token');
+                        const response = await fetch(gatewayQuoteUrl, {
                           method: 'POST',
                           headers: {
-                            'Content-Type': 'application/json'
+                            'Content-Type': 'application/json',
+                            'apikey': import.meta.env.VITE_SUPABASE_ANON_KEY || '',
+                            ...(quoteToken ? { 'Authorization': `Bearer ${quoteToken}` } : {})
                           },
                           body: JSON.stringify({
                             status: true,

@@ -5,6 +5,16 @@ const SUPABASE_URL = import.meta.env.VITE_SUPABASE_URL;
 const ANON_KEY = import.meta.env.VITE_SUPABASE_ANON_KEY;
 const DEFAULT_S3_BUCKET = import.meta.env.VITE_AWS_STORAGE_BUCKET_NAME || 'paybue-invoice-estimation';
 
+function isAwsS3Bucket(target?: string): boolean {
+  if (!target) return false;
+  const configuredBucket = import.meta.env.VITE_AWS_STORAGE_BUCKET_NAME;
+  const lower = target.toLowerCase();
+  if (configuredBucket && (lower === configuredBucket.toLowerCase() || lower.includes(configuredBucket.toLowerCase()))) {
+    return true;
+  }
+  return lower === 'paybue-invoice-estimation' || lower.includes('paybue-invoice-estimation');
+}
+
 /**
  * S3UploadService
  * Secure client-side storage service.
@@ -78,7 +88,7 @@ export class S3UploadService {
     const subFolder = parts.length > 1 ? parts.slice(1).join('/') : "";
 
     // 1. ROUTE TO AWS S3 VIA SECURE SERVER-SIDE PRESIGNED URL
-    if (bucketName === 'paybue-invoice-estimation' || bucketInput.includes('paybue-invoice-estimation')) {
+    if (isAwsS3Bucket(bucketName) || isAwsS3Bucket(bucketInput)) {
       if (!token) throw new Error("Authentication required for file upload.");
 
       // Map subfolder to allowed server folder (invoices, estimates, signatures, logos, blueprints)
@@ -209,7 +219,7 @@ export class S3UploadService {
     }
 
     const targetBucket = bucketInput || DEFAULT_S3_BUCKET;
-    const isAwsBucket = targetBucket === 'paybue-invoice-estimation' || targetBucket.includes('paybue-invoice-estimation');
+    const isAwsBucket = isAwsS3Bucket(targetBucket);
 
     if (isAwsBucket) {
         const parts = targetBucket.split('/');

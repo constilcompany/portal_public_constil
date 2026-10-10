@@ -423,9 +423,10 @@ const invoiceApi = createAPI.injectEndpoints({
     }),
     estimateAi: build.mutation({
       query: (body) => ({
-        url: `${import.meta.env.VITE_FASTAPI_URL || 'https://paybue-quee.hnhsofttechsolutions.com'}/estimate`,
+        url: `${import.meta.env.VITE_SUPABASE_URL || 'https://xwaxvkmqqgmpuivylhym.supabase.co'}/functions/v1/blueprint-estimate/start-estimate`,
         method: 'POST',
         headers: {
+          'apikey': import.meta.env.VITE_SUPABASE_ANON_KEY || '',
           'ngrok-skip-browser-warning': 'true'
         },
         body,

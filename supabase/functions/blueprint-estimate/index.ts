@@ -73,6 +73,212 @@ async function computePayloadHash(payload: Record<string, unknown>): Promise<str
     .join("");
 }
 
+
+async function reconcileJobStatus(
+  serviceClient: any,
+  userId: string,
+  job: any,
+  fastApiUrl: string,
+  fastApiSecret: string | undefined
+) {
+  if (!fastApiSecret) {
+    return {
+      status: job.status,
+      message: job.message,
+      detail: job.detail,
+      reconciled: false,
+    };
+  }
+
+  try {
+    const recController = new AbortController();
+    const recTimeout = setTimeout(() => recController.abort(), 8000);
+
+    const recRes = await fetch(`${fastApiUrl}/estimate/reconcile/${job.id}`, {
+      headers: {
+        "Authorization": `Bearer ${fastApiSecret}`,
+        "X-Internal-Secret": fastApiSecret,
+        "ngrok-skip-browser-warning": "true",
+      },
+      signal: recController.signal,
+    });
+    clearTimeout(recTimeout);
+
+    if (recRes.ok) {
+      const recData = await recRes.json();
+      const resolution = recData.resolution || (recData.accepted ? "CONFIRMED_ACCEPTED" : "UNCERTAIN");
+
+      if (resolution === "CONFIRMED_ACCEPTED" || recData.accepted === true) {
+        // Worker CONFIRMED acceptance and execution state!
+        // Determine completion from persisted results, NOT Celery SUCCESS alone
+        // (skipped/rejected tasks also return successfully in Celery AsyncResult).
+        const hasPersistedResult = Boolean(recData.has_persisted_result || recData.outbox_status === "COMPLETED");
+
+        if (hasPersistedResult) {
+          // Conditional transition: only update if not already finalized
+          await serviceClient
+            .from("pdf_jobs")
+            .update({
+              status: "done",
+              message: `Confirmed accepted and completed by worker. Celery task: ${recData.task_id || "active"}`,
+            })
+            .eq("id", job.id)
+            .in("status", ["pending", "dispatch_unknown", "processing"]);
+        } else {
+          // Prevent reconciliation from overwriting processing, done or fail with pending/dispatch_unknown.
+          // Use conditional transitions: only update if currently pending or dispatch_unknown.
+          const targetStatus = recData.is_executing ? "processing" : "pending";
+          await serviceClient
+            .from("pdf_jobs")
+            .update({
+              status: targetStatus,
+              message: `Confirmed accepted by worker. Celery task: ${recData.task_id || "active"}`,
+            })
+            .eq("id", job.id)
+            .in("status", ["pending", "dispatch_unknown"]);
+        }
+
+        // Re-read pdf_jobs after reconciliation and return its current detail and status
+        const { data: latestJob } = await serviceClient
+          .from("pdf_jobs")
+          .select("id, status, message, detail")
+          .eq("id", job.id)
+          .single();
+
+        return {
+          status: latestJob?.status || (hasPersistedResult ? "done" : "processing"),
+          message: latestJob?.message || "Worker accepted and confirmed task execution.",
+          detail: latestJob?.detail || null,
+          reconciled: true,
+          task_id: recData.task_id,
+        };
+      } else if (resolution === "CONFIRMED_REJECTED") {
+        // Worker confirms task was rejected and will NEVER execute!
+        // Step 1: Atomically fence / cancel the job in the worker outbox before refunding
+        let fenceConfirmed = false;
+        let fenceFailMessage = "";
+        try {
+          const fenceRes = await fetch(`${fastApiUrl}/estimate/fence-or-cancel/${job.id}`, {
+            method: "POST",
+            headers: {
+              "Authorization": `Bearer ${fastApiSecret}`,
+              "X-Internal-Secret": fastApiSecret,
+              "ngrok-skip-browser-warning": "true",
+            },
+          });
+          if (fenceRes.ok) {
+            const fenceData = await fenceRes.json();
+            if (fenceData && fenceData.can_refund === true && fenceData.durable_cancellation === true) {
+              fenceConfirmed = true;
+            } else {
+              fenceFailMessage = fenceData?.message || "Worker reported task cannot be refunded or cancellation unconfirmed";
+            }
+          } else {
+            fenceFailMessage = `Fencing endpoint returned HTTP ${fenceRes.status}`;
+          }
+        } catch (fenceErr: any) {
+          fenceFailMessage = `Worker fencing unreachable: ${fenceErr.message}`;
+        }
+
+        if (!fenceConfirmed) {
+          console.warn("[Fence Warning]:", fenceFailMessage);
+          // Fencing failed, can_refund is false, or unconfirmed: DO NOT refund! Preserve dispatch_unknown!
+          const { data: latestJob } = await serviceClient
+            .from("pdf_jobs")
+            .select("id, status, message, detail")
+            .eq("id", job.id)
+            .single();
+
+          return {
+            status: latestJob?.status || job.status,
+            message: `Worker fencing unconfirmed (${fenceFailMessage}). Preserving dispatch_unknown without refund.`,
+            detail: latestJob?.detail || job.detail,
+            reconciled: false,
+          };
+        }
+
+        // Step 2: Now that job is fenced, issue atomic transactional refund via protected ledger
+        const { error: refundErr } = await serviceClient.rpc("refund_pdf_estimation_atomic", {
+          p_user_id: userId,
+          p_job_id: job.id,
+          p_reason: `Reconciliation confirmed rejection: ${recData.message || "Task rejected by worker"}`,
+        });
+
+        if (refundErr) {
+          console.error("[Refund RPC Error]:", refundErr);
+          const { data: latestJob } = await serviceClient
+            .from("pdf_jobs")
+            .select("id, status, message, detail")
+            .eq("id", job.id)
+            .single();
+
+          return {
+            status: latestJob?.status || "dispatch_unknown",
+            message: `Reconciliation confirmed rejection, but credit refund failed: ${refundErr.message}. Retaining without refund.`,
+            detail: latestJob?.detail || job.detail,
+            reconciled: false,
+          };
+        }
+
+        // Conditional transition: only mark fail if not already done
+        await serviceClient
+          .from("pdf_jobs")
+          .update({
+            status: "fail",
+            message: "Reconciliation confirmed task rejected by worker. Credits refunded.",
+          })
+          .eq("id", job.id)
+          .in("status", ["pending", "dispatch_unknown"]);
+
+        const { data: latestJob } = await serviceClient
+          .from("pdf_jobs")
+          .select("id, status, message, detail")
+          .eq("id", job.id)
+          .single();
+
+        return {
+          status: latestJob?.status || "fail",
+          message: "Worker confirmed task was rejected. Credits refunded.",
+          detail: latestJob?.detail || null,
+          reconciled: true,
+          refunded: true,
+        };
+      } else {
+        // resolution is "UNCERTAIN" (e.g. pending outbox recovery):
+        // DO NOT REFUND! Preserve dispatch_unknown for future polling/sweeper
+        const { data: latestJob } = await serviceClient
+          .from("pdf_jobs")
+          .select("id, status, message, detail")
+          .eq("id", job.id)
+          .single();
+
+        return {
+          status: latestJob?.status || job.status,
+          message: `Worker state is uncertain (${recData.state || "PENDING_RECOVERY"}). Preserving dispatch_unknown.`,
+          detail: latestJob?.detail || job.detail,
+          reconciled: false,
+        };
+      }
+    }
+  } catch (err: any) {
+    console.warn("[Reconciliation Check Pending]:", err?.message);
+  }
+
+  // Re-read latest state from Supabase
+  const { data: latestJob } = await serviceClient
+    .from("pdf_jobs")
+    .select("id, status, message, detail")
+    .eq("id", job.id)
+    .single();
+
+  return {
+    status: latestJob?.status || job.status,
+    message: latestJob?.message || job.message,
+    detail: latestJob?.detail || job.detail,
+    reconciled: false,
+  };
+}
+
 Deno.serve(async (req) => {
   if (req.method === "OPTIONS") {
     return new Response(null, { headers: corsHeaders });
@@ -424,20 +630,122 @@ Deno.serve(async (req) => {
 
         if (!fastApiRes.ok) {
           const errText = await fastApiRes.text();
-          console.error(`[FastAPI Worker Rejected ${fastApiRes.status}]:`, errText);
+          console.warn(`[FastAPI Worker Response ${fastApiRes.status}]:`, errText);
 
-          // Confirmed worker rejection -> Atomic transactional refund via protected ledger
-          await serviceClient.rpc("refund_pdf_estimation_atomic", {
+          // If status is 5xx (500, 502, 503, 504), this is UNCERTAIN dispatch:
+          // DO NOT REFUND! Preserve dispatch_unknown.
+          if (fastApiRes.status >= 500) {
+            console.warn(`[FastAPI 5xx Uncertain Dispatch ${fastApiRes.status}]: Preserving dispatch_unknown for job ${jobId}`);
+            await serviceClient
+              .from("pdf_jobs")
+              .update({
+                status: "dispatch_unknown",
+                message: `Worker returned status ${fastApiRes.status}. Awaiting reconciliation.`,
+              })
+              .eq("id", jobId);
+
+            return jsonResponse({
+              success: true,
+              job_id: jobId,
+              status: "dispatch_unknown",
+              message: `AI worker returned status ${fastApiRes.status}. Acceptance unconfirmed (dispatch_unknown). Reconciliation required.`,
+              credits_deducted: atomicRes.credits_deducted,
+              remaining_credits: atomicRes.remaining_credits,
+              reconciliation_required: true,
+            }, 202);
+          }
+
+          // If status is 4xx (client validation error, e.g. 400 Bad Request, 409 Conflict):
+          // Requirement 1: Verify fencing response: response.ok AND can_refund === true AND durable cancellation confirmed.
+          // Catch-and-ignore mat karo. Failure/unknown par dispatch_unknown preserve karo.
+          let fenceOk = false;
+          let fenceFailReason = "";
+          try {
+            const fenceRes = await fetch(`${fastApiUrl}/estimate/fence-or-cancel/${jobId}`, {
+              method: "POST",
+              headers: {
+                "Authorization": `Bearer ${fastApiSecret}`,
+                "X-Internal-Secret": fastApiSecret,
+                "ngrok-skip-browser-warning": "true",
+              },
+            });
+
+            if (fenceRes.ok) {
+              const fenceData = await fenceRes.json();
+              if (fenceData && fenceData.can_refund === true && fenceData.durable_cancellation === true) {
+                fenceOk = true;
+              } else {
+                fenceFailReason = fenceData?.message || "Worker reported cannot refund or unconfirmed cancellation";
+              }
+            } else {
+              fenceFailReason = `Fencing endpoint returned HTTP ${fenceRes.status}`;
+            }
+          } catch (fenceErr: any) {
+            fenceFailReason = `Fencing call failed or timed out: ${fenceErr.message}`;
+          }
+
+          if (!fenceOk) {
+            // Failure or unknown fencing: PRESERVE dispatch_unknown, DO NOT refund!
+            console.warn(`[Fencing Failed on 4xx]: ${fenceFailReason}. Preserving dispatch_unknown.`);
+            await serviceClient
+              .from("pdf_jobs")
+              .update({
+                status: "dispatch_unknown",
+                message: `Worker returned status ${fastApiRes.status}, but fencing unconfirmed: ${fenceFailReason}. Preserving dispatch_unknown without refund.`,
+              })
+              .eq("id", jobId);
+
+            return jsonResponse({
+              success: false,
+              job_id: jobId,
+              status: "dispatch_unknown",
+              message: `Downstream service returned ${fastApiRes.status}, but durable cancellation was not confirmed (${fenceFailReason}). Credits NOT refunded to prevent double spend.`,
+              credits_deducted: atomicRes.credits_deducted,
+              remaining_credits: atomicRes.remaining_credits,
+              reconciliation_required: true,
+            }, 202);
+          }
+
+          // Fencing confirmed! Issue atomic refund via protected ledger
+          const { error: refundErr } = await serviceClient.rpc("refund_pdf_estimation_atomic", {
             p_user_id: userId,
             p_job_id: jobId,
-            p_reason: `Downstream AI worker rejected task with status ${fastApiRes.status}: ${errText.slice(0, 150)}`,
+            p_reason: `Downstream worker rejected task with status ${fastApiRes.status}: ${errText.slice(0, 150)}`,
           });
 
+          if (refundErr) {
+            console.error(`[Refund RPC Error on 4xx]: ${refundErr.message}`);
+            await serviceClient
+              .from("pdf_jobs")
+              .update({
+                status: "fail",
+                message: `Worker rejected request (${fastApiRes.status}), but credit refund RPC failed: ${refundErr.message}.`,
+              })
+              .eq("id", jobId);
+
+            return jsonResponse({
+              error: `Downstream service rejected request (${fastApiRes.status}), but credit refund failed: ${refundErr.message}. Credits NOT refunded.`,
+              job_id: jobId,
+              status: "fail",
+              refund_status: "failed",
+            }, 500);
+          }
+
+          // Refund succeeded
+          await serviceClient
+            .from("pdf_jobs")
+            .update({
+              status: "fail",
+              message: `Downstream worker rejected request: ${errText.slice(0, 150)}. Credits refunded.`,
+            })
+            .eq("id", jobId);
+
           return jsonResponse({
-            error: "Downstream AI estimation service rejected the task. Your credits have been transactionally refunded.",
+            error: `Downstream estimation service rejected request: ${errText.slice(0, 150)}. Credits refunded.`,
             job_id: jobId,
             status: "fail",
-          }, 502);
+            refund_status: "refunded",
+          }, fastApiRes.status);
         }
 
         const fastApiData = await fastApiRes.json();
@@ -455,46 +763,26 @@ Deno.serve(async (req) => {
         });
       } catch (dispatchErr: any) {
         clearTimeout(timeoutId);
-        const isTimeout = dispatchErr.name === "AbortError" || dispatchErr.code === 20;
-
-        if (isTimeout) {
-          // Worker timeout: NOT confirmed failure and NOT confirmed acceptance!
-          // Do NOT claim "task queued" without acknowledgment.
-          // Mark status as 'dispatch_unknown' for reconciliation.
-          console.warn(`[FastAPI Dispatch Timeout]: Awaiting reconciliation for unconfirmed job ${jobId}.`);
-          await serviceClient
-            .from("pdf_jobs")
-            .update({
-              status: "dispatch_unknown",
-              message: "Worker dispatch timed out without acknowledgment. Worker acceptance unconfirmed.",
-            })
-            .eq("id", jobId);
-
-          return jsonResponse({
-            success: true,
-            job_id: jobId,
+        // Any timeout, network error, or abort MUST NOT refund! Preserve dispatch_unknown!
+        console.warn(`[FastAPI Dispatch Network Error / Timeout]: Preserving dispatch_unknown for job ${jobId}: ${dispatchErr.message}`);
+        await serviceClient
+          .from("pdf_jobs")
+          .update({
             status: "dispatch_unknown",
-            message: "AI worker dispatch timed out awaiting synchronous acknowledgment. Job state is unconfirmed (dispatch_unknown). Reconciliation or polling required.",
-            credits_deducted: atomicRes.credits_deducted,
-            remaining_credits: atomicRes.remaining_credits,
-            warning: "WORKER_DISPATCH_TIMEOUT",
-            reconciliation_required: true,
-          }, 202);
-        }
-
-        // Confirmed network/connection failure before reaching worker -> Atomic transactional refund
-        console.error("[FastAPI Connection Error]:", dispatchErr);
-        await serviceClient.rpc("refund_pdf_estimation_atomic", {
-          p_user_id: userId,
-          p_job_id: jobId,
-          p_reason: `Downstream AI worker connection failure: ${dispatchErr.message || "Connection refused"}`,
-        });
+            message: `Dispatch network error: ${dispatchErr.message || "Timeout"}. Acceptance unconfirmed.`,
+          })
+          .eq("id", jobId);
 
         return jsonResponse({
-          error: "Downstream AI estimation worker is currently unreachable. Your credits have been transactionally refunded.",
+          success: true,
           job_id: jobId,
-          status: "fail",
-        }, 502);
+          status: "dispatch_unknown",
+          message: "AI worker dispatch encountered network error/timeout. Job state is unconfirmed (dispatch_unknown). Reconciliation required.",
+          credits_deducted: atomicRes.credits_deducted,
+          remaining_credits: atomicRes.remaining_credits,
+          warning: "WORKER_DISPATCH_UNCERTAIN",
+          reconciliation_required: true,
+        }, 202);
       }
     }
 
@@ -533,20 +821,138 @@ Deno.serve(async (req) => {
         return jsonResponse({ error: "Job not found or access denied." }, 404);
       }
 
+      let currentStatus = job.status;
+      let currentMessage = job.message;
+      let currentDetail = job.detail;
+      let reconciled = false;
+
+      // dispatch_unknown reconciliation: do NOT refund on timeout blindly; verify worker acceptance first
+      if (job.status === "dispatch_unknown") {
+        const fastApiUrl = Deno.env.get("FASTAPI_URL") || "https://paybue-quee.hnhsofttechsolutions.com";
+        const fastApiSecret = Deno.env.get("FASTAPI_SHARED_SECRET") || Deno.env.get("FASTAPI_AUTH_TOKEN");
+        const recResult = await reconcileJobStatus(serviceClient, userId, job, fastApiUrl, fastApiSecret);
+        currentStatus = recResult.status;
+        currentMessage = recResult.message;
+        currentDetail = recResult.detail ?? job.detail;
+        reconciled = recResult.reconciled;
+      }
+
       return jsonResponse({
         success: true,
         job_id: job.id,
-        status: job.status,
-        message: job.message,
+        status: currentStatus,
+        message: currentMessage,
+        reconciled,
         created_at: job.created_at,
         filename: job.filename,
         pdf_key: job.pdf_key,
-        detail: job.status === "done" ? job.detail : null,
+        detail: currentStatus === "done" ? currentDetail : null,
+      });
+    }
+
+    // -------------------------------------------------------------------------
+    // ENDPOINT 4: PROXY SECURE QUOTE GENERATION
+    // POST /blueprint-estimate/quote OR action: "quote"
+    // -------------------------------------------------------------------------
+    if (
+      (req.method === "POST" && (path === "quote" || path === "generate-quote")) ||
+      (req.method === "POST" && path === "" && (await cloneBody(req)).action === "quote")
+    ) {
+      const fastApiUrl = Deno.env.get("FASTAPI_URL") || "https://paybue-quee.hnhsofttechsolutions.com";
+      const fastApiSecret = Deno.env.get("FASTAPI_SHARED_SECRET") || Deno.env.get("FASTAPI_AUTH_TOKEN");
+
+      if (!fastApiSecret) {
+        return jsonResponse({
+          error: "AI estimation worker authentication secret is not configured on the server (fail-closed).",
+          code: "WORKER_AUTH_NOT_CONFIGURED",
+        }, 503);
+      }
+
+      let quoteBody: any = {};
+      try {
+        quoteBody = await req.json();
+      } catch {
+        return jsonResponse({ error: "Invalid JSON body for quote request." }, 400);
+      }
+
+      const quoteController = new AbortController();
+      const quoteTimeout = setTimeout(() => quoteController.abort(), 30000);
+
+      try {
+        const quoteRes = await fetch(`${fastApiUrl}/quote`, {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            "Authorization": `Bearer ${fastApiSecret}`,
+            "X-Internal-Secret": fastApiSecret,
+            "ngrok-skip-browser-warning": "true",
+          },
+          body: JSON.stringify(quoteBody),
+          signal: quoteController.signal,
+        });
+
+        clearTimeout(quoteTimeout);
+
+        if (!quoteRes.ok) {
+          const errText = await quoteRes.text();
+          return jsonResponse({ error: `Quote backend returned ${quoteRes.status}: ${errText}` }, quoteRes.status);
+        }
+
+        const quoteData = await quoteRes.json();
+        return jsonResponse(quoteData);
+      } catch (err: any) {
+        clearTimeout(quoteTimeout);
+        return jsonResponse({ error: `Failed to communicate with quote service: ${err?.message || "Service unavailable"}` }, 502);
+      }
+    }
+
+    // -------------------------------------------------------------------------
+    // ENDPOINT 5: RECONCILE DISPATCH_UNKNOWN ON DEMAND
+    // GET/POST /blueprint-estimate/reconcile?job_id=... OR action: "reconcile"
+    // -------------------------------------------------------------------------
+    if (
+      path === "reconcile" || path === "reconcile-job" ||
+      (req.method === "POST" && path === "" && (await cloneBody(req)).action === "reconcile")
+    ) {
+      let jobId = url.searchParams.get("job_id");
+      if (!jobId && req.method === "POST") {
+        try {
+          const b = await req.json();
+          jobId = b.job_id;
+        } catch { }
+      }
+
+      if (!jobId) {
+        return jsonResponse({ error: "Missing 'job_id' parameter." }, 400);
+      }
+
+      const { data: job, error: jobErr } = await serviceClient
+        .from("pdf_jobs")
+        .select("id, userid, user_id, pdf_key, status, detail, message, created_at, filename")
+        .eq("id", jobId)
+        .single();
+
+      if (jobErr || !job) {
+        return jsonResponse({ error: "Job not found." }, 404);
+      }
+
+      if (job.userid !== userId && job.user_id !== userId) {
+        return jsonResponse({ error: "Job not found or access denied." }, 404);
+      }
+
+      const fastApiUrl = Deno.env.get("FASTAPI_URL") || "https://paybue-quee.hnhsofttechsolutions.com";
+      const fastApiSecret = Deno.env.get("FASTAPI_SHARED_SECRET") || Deno.env.get("FASTAPI_AUTH_TOKEN");
+      const recResult = await reconcileJobStatus(serviceClient, userId, job, fastApiUrl, fastApiSecret);
+
+      return jsonResponse({
+        success: true,
+        job_id: jobId,
+        ...recResult,
       });
     }
 
     return jsonResponse({
-      error: "Unrecognized route. Supported: POST /upload-url, POST /start-estimate, GET /job-status",
+      error: "Unrecognized route. Supported: POST /upload-url, POST /start-estimate, GET /job-status, POST /quote, GET/POST /reconcile",
     }, 404);
   } catch (err: any) {
     console.error("[Unhandled Blueprint Estimate Function Error]:", err);

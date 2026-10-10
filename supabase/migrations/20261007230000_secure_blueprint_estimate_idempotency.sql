@@ -132,7 +132,36 @@ BEGIN
     WHERE user_id = p_user_id
     FOR UPDATE;
 
-    IF FOUND THEN
+    -- Concurrency Check Under Row Lock:
+    -- If a concurrent transaction completed while waiting for the user lock, catch it immediately!
+    IF p_idempotency_key IS NOT NULL AND length(trim(p_idempotency_key)) > 0 THEN
+        SELECT job_id, payload_hash INTO v_existing_idemp
+        FROM public.pdf_job_idempotency
+        WHERE user_id = p_user_id AND idempotency_key = p_idempotency_key;
+
+        IF FOUND THEN
+            IF v_existing_idemp.payload_hash != p_payload_hash THEN
+                RAISE EXCEPTION 'IDEMPOTENCY_PAYLOAD_MISMATCH: Idempotency key % already used with different payload', p_idempotency_key
+                    USING ERRCODE = 'P0001';
+            END IF;
+
+            SELECT * INTO v_existing_job
+            FROM public.pdf_jobs
+            WHERE id = v_existing_idemp.job_id;
+
+            RETURN jsonb_build_object(
+                'status', 'idempotent_replay',
+                'job_id', v_existing_idemp.job_id,
+                'job_status', COALESCE(v_existing_job.status, 'pending'),
+                'message', COALESCE(v_existing_job.message, 'Existing active estimation job returned'),
+                'created_at', v_existing_job.created_at,
+                'credits_deducted', 0,
+                'is_retry', true
+            );
+        END IF;
+    END IF;
+
+    IF v_wallet.user_id IS NOT NULL THEN
         IF v_wallet.ai_estimate_unlimited = TRUE THEN
             v_credits_deducted := 0;
             v_deducted_from := 'unlimited';
@@ -156,7 +185,34 @@ BEGIN
         WHERE user_id = p_user_id
         FOR UPDATE;
 
-        IF FOUND AND v_legacy.balance >= v_action_cost THEN
+        IF p_idempotency_key IS NOT NULL AND length(trim(p_idempotency_key)) > 0 THEN
+            SELECT job_id, payload_hash INTO v_existing_idemp
+            FROM public.pdf_job_idempotency
+            WHERE user_id = p_user_id AND idempotency_key = p_idempotency_key;
+
+            IF FOUND THEN
+                IF v_existing_idemp.payload_hash != p_payload_hash THEN
+                    RAISE EXCEPTION 'IDEMPOTENCY_PAYLOAD_MISMATCH: Idempotency key % already used with different payload', p_idempotency_key
+                        USING ERRCODE = 'P0001';
+                END IF;
+
+                SELECT * INTO v_existing_job
+                FROM public.pdf_jobs
+                WHERE id = v_existing_idemp.job_id;
+
+                RETURN jsonb_build_object(
+                    'status', 'idempotent_replay',
+                    'job_id', v_existing_idemp.job_id,
+                    'job_status', COALESCE(v_existing_job.status, 'pending'),
+                    'message', COALESCE(v_existing_job.message, 'Existing active estimation job returned'),
+                    'created_at', v_existing_job.created_at,
+                    'credits_deducted', 0,
+                    'is_retry', true
+                );
+            END IF;
+        END IF;
+
+        IF v_legacy.user_id IS NOT NULL AND v_legacy.balance >= v_action_cost THEN
             UPDATE public.user_credits
             SET balance = balance - v_action_cost
             WHERE user_id = p_user_id;

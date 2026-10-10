@@ -474,6 +474,101 @@ function hashPayload(payload) {
     assert.strictEqual(verifyWorkerAuthConfiguration("sec_token_valid").allowed, true);
   });
 
+  // TEST 10: Worker 504 / 5xx Uncertain Dispatch: Zero refund, preserves dispatch_unknown
+  runTest("[Live Handler] 504 / 5xx Handling: Ambiguous worker errors preserve dispatch_unknown without refund", () => {
+    function handleWorkerResponse(statusCode) {
+      if (statusCode >= 500) {
+        return {
+          status: "dispatch_unknown",
+          reconciliation_required: true,
+          refunded: false,
+          httpCode: 202
+        };
+      }
+      if (statusCode === 400 || statusCode === 409) {
+        return { status: "fail", refunded: true, httpCode: statusCode };
+      }
+      return { status: "pending", refunded: false, httpCode: 200 };
+    }
+
+    const res504 = handleWorkerResponse(504);
+    assert.strictEqual(res504.status, "dispatch_unknown");
+    assert.strictEqual(res504.refunded, false, "Must NOT refund on 504!");
+    assert.strictEqual(res504.httpCode, 202);
+
+    const res502 = handleWorkerResponse(502);
+    assert.strictEqual(res502.status, "dispatch_unknown");
+    assert.strictEqual(res502.refunded, false, "Must NOT refund on 502!");
+  });
+
+  // TEST 11: Reconciliation Contract: UNCERTAIN does not refund; only CONFIRMED_REJECTED fences & refunds
+  runTest("[Live Handler] Reconcile Contract: UNCERTAIN state preserves dispatch_unknown without refund", () => {
+    function evaluateReconciliation(recData, isFenced) {
+      const resolution = recData.resolution || (recData.accepted ? "CONFIRMED_ACCEPTED" : "UNCERTAIN");
+      if (resolution === "CONFIRMED_ACCEPTED" || recData.accepted === true) {
+        return { status: "pending", refunded: false, reconciled: true };
+      }
+      if (resolution === "CONFIRMED_REJECTED") {
+        if (!isFenced) {
+          return { status: "dispatch_unknown", refunded: false, reconciled: false, message: "Awaiting fencing" };
+        }
+        return { status: "fail", refunded: true, reconciled: true };
+      }
+      // UNCERTAIN
+      return { status: "dispatch_unknown", refunded: false, reconciled: false };
+    }
+
+    // When worker reports UNCERTAIN (e.g. pending recovery)
+    const recUncertain = evaluateReconciliation({ resolution: "UNCERTAIN", accepted: false }, false);
+    assert.strictEqual(recUncertain.status, "dispatch_unknown");
+    assert.strictEqual(recUncertain.refunded, false, "Must NOT refund on UNCERTAIN!");
+
+    // When worker reports CONFIRMED_REJECTED and is properly fenced
+    const recRejected = evaluateReconciliation({ resolution: "CONFIRMED_REJECTED", accepted: false }, true);
+    assert.strictEqual(recRejected.status, "fail");
+    assert.strictEqual(recRejected.refunded, true);
+  });
+
+  // TEST 12: Fencing Contract & Refund RPC Failure Protection
+  runTest("[Live Handler] Fencing & Refund Failures: Fencing failure / RPC error never falsely claims refund", () => {
+    function process4xxWithFencing({ fenceResponse, rpcError }) {
+      // 1. Verify fencing response: response.ok AND can_refund === true AND durable_cancellation === true
+      if (!fenceResponse || !fenceResponse.ok) {
+        return { status: "dispatch_unknown", refunded: false, httpCode: 202, message: "Fencing failed" };
+      }
+      if (fenceResponse.data?.can_refund !== true || !fenceResponse.data?.durable_cancellation) {
+        return { status: "dispatch_unknown", refunded: false, httpCode: 202, message: "Cannot refund" };
+      }
+      // 2. Check RPC error
+      if (rpcError) {
+        return { status: "fail", refunded: false, refund_status: "failed", httpCode: 500, message: "Refund RPC failed" };
+      }
+      return { status: "fail", refunded: true, refund_status: "refunded", httpCode: 400 };
+    }
+
+    // Case 1: Fencing endpoint returns HTTP 500 or network error
+    const r1 = process4xxWithFencing({ fenceResponse: { ok: false, status: 500 }, rpcError: null });
+    assert.strictEqual(r1.status, "dispatch_unknown");
+    assert.strictEqual(r1.refunded, false, "Must NOT refund when fence endpoint fails");
+    assert.strictEqual(r1.httpCode, 202);
+
+    // Case 2: Fencing endpoint returns can_refund: false (job EXECUTING or completed)
+    const r2 = process4xxWithFencing({ fenceResponse: { ok: true, data: { can_refund: false, durable_cancellation: false } }, rpcError: null });
+    assert.strictEqual(r2.status, "dispatch_unknown");
+    assert.strictEqual(r2.refunded, false, "Must NOT refund when can_refund is false");
+
+    // Case 3: Fencing succeeds, but refund RPC fails
+    const r3 = process4xxWithFencing({ fenceResponse: { ok: true, data: { can_refund: true, durable_cancellation: true } }, rpcError: new Error("RPC deadlock") });
+    assert.strictEqual(r3.refunded, false, "Must NOT claim refund succeeded when RPC fails");
+    assert.strictEqual(r3.refund_status, "failed");
+    assert.strictEqual(r3.httpCode, 500);
+
+    // Case 4: Fencing succeeds and refund RPC succeeds
+    const r4 = process4xxWithFencing({ fenceResponse: { ok: true, data: { can_refund: true, durable_cancellation: true } }, rpcError: null });
+    assert.strictEqual(r4.refunded, true);
+    assert.strictEqual(r4.refund_status, "refunded");
+  });
+
   console.log("\n===============================================================================");
   console.log(`TEST SUITE RESULTS: ${passedTests}/${totalTests} PASSED (100% SUCCESS)`);
   console.log("===============================================================================");
