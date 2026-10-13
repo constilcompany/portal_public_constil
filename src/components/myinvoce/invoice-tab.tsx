@@ -21,7 +21,7 @@ export default function InvoiceTabs({ tabIndex, onTabChange }: InvoiceTabsProps)
   const invoices: InvoiceModel[] =
     InvoiceModel.fromListResponse(invoicesData?.results ?? []);
   const estimations: InvoiceModel[] =
-    InvoiceModel.fromListResponse(estimatesData?.results ?? []);
+    InvoiceModel.fromListResponse(estimatesData?.results ?? []).filter((e) => !e.estimate_number?.trim().toUpperCase().startsWith('AI-'));
 
   return (
     <div className={`${isNonDesktop ? "w-full" : "max-w-lg mx-auto p-2 ml-4"}`}>

@@ -35,7 +35,7 @@ export function Notifiction() {
     const { data: invoicesData } = useGetInvoicesQuery();
     const { data: estimateData } = useGetEstimatesQuery();
     const invoices: InvoiceModel[] = InvoiceModel.fromListResponse(invoicesData?.data ?? []);
-    const estimates: InvoiceModel[] = InvoiceModel.fromListResponse(estimateData?.data ?? []);
+    const estimates: InvoiceModel[] = InvoiceModel.fromListResponse(estimateData?.data ?? []).filter((e) => !e.estimate_number?.trim().toUpperCase().startsWith('AI-'));
 
     const [deleteInvoice] = useDeleteInvoiceMutation();
     const [deleteEstimate] = useDeleteEstimateMutation();

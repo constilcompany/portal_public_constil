@@ -26,7 +26,7 @@ export function Home() {
   const { data: aiEstimatesData, isLoading: aiEstimatesLoading } = useAllAiEstimateQuery();
 
   const invoiceCount = invoicesData?.data?.length || 0;
-  const estimateCount = estimatesData?.data?.length || 0;
+  const estimateCount = estimatesData?.data?.filter((item: any) => !item.estimate_number?.trim().toUpperCase().startsWith("AI-")).length || 0;
   const aiEstimateCount = aiEstimatesData?.length || 0;
 
   // Calculate this month's stats in frontend since the dashboard view has permission issues

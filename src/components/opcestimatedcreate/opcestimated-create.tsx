@@ -29,7 +29,15 @@ const OptionEstimateCreated = () => {
     refetch();
   }, [refetch]);
 
-  const estimations: InvoiceModel[] = InvoiceModel.fromListResponse(search ? searchData?.data || [] : data?.data || []);
+  // Only list normal estimates on this screen; AI estimates are displayed in the Estimates AI section
+  const isAiEstimate = (inv: InvoiceModel) => {
+    return Boolean(inv.estimate_number?.trim().toUpperCase().startsWith('AI-'));
+  };
+
+  const estimations: InvoiceModel[] = InvoiceModel.fromListResponse(
+    search ? searchData?.data || [] : data?.data || []
+  ).filter((inv: InvoiceModel) => !isAiEstimate(inv));
+
   const filteredEstimates = estimations.filter((inv: InvoiceModel) =>
     search ? inv.client_name?.toLowerCase().includes(search.toLowerCase()) : true
   );
