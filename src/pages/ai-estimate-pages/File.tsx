@@ -1067,18 +1067,38 @@ ${proposalPricingText}
         client_signature: clientSignatureUrl
       };
 
-      // 1. Send to audit quote API via secure gateway
+      // 1. Send to audit quote API via secure gateway with fallback
       const gatewayQuoteUrl = `${import.meta.env.VITE_SUPABASE_URL || 'https://xwaxvkmqqgmpuivylhym.supabase.co'}/functions/v1/blueprint-estimate/quote`;
+      const directQuoteUrl = `${import.meta.env.VITE_FASTAPI_URL || 'https://paybue-quee.hnhsofttechsolutions.com'}/quote`;
       const quoteToken = authToken || localStorage.getItem('access_token');
-      const response = await fetch(gatewayQuoteUrl, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'apikey': import.meta.env.VITE_SUPABASE_ANON_KEY || '',
-          ...(quoteToken ? { 'Authorization': `Bearer ${quoteToken}` } : {})
-        },
-        body: JSON.stringify(payload)
-      });
+      let response: Response;
+      try {
+        response = await fetch(gatewayQuoteUrl, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'apikey': import.meta.env.VITE_SUPABASE_ANON_KEY || '',
+            ...(quoteToken ? { 'Authorization': `Bearer ${quoteToken}` } : {})
+          },
+          body: JSON.stringify(payload)
+        });
+
+        if (!response.ok) {
+          console.warn(`[AUDIT QUOTE] Gateway returned status ${response.status}, attempting fallback to direct service...`);
+          response = await fetch(directQuoteUrl, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(payload)
+          });
+        }
+      } catch (gatewayErr) {
+        console.warn('[AUDIT QUOTE] Gateway request failed, attempting fallback to direct service...', gatewayErr);
+        response = await fetch(directQuoteUrl, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(payload)
+        });
+      }
 
       if (!response.ok) {
         throw new Error(`HTTP error! status: ${response.status}`);
@@ -1099,8 +1119,9 @@ ${proposalPricingText}
         if (userId && token) {
           // 0. Get or Create a Client for this email
           let clientId = null;
+          const restBaseUrl = import.meta.env.DEV ? '/debug-supabase' : supabaseUrl;
           try {
-            const clientRes = await fetch(`${supabaseUrl}/rest/v1/clients?email=eq.${encodeURIComponent(customerEmail.trim())}&select=id`, {
+            const clientRes = await fetch(`${restBaseUrl}/rest/v1/clients?email=eq.${encodeURIComponent(customerEmail.trim())}&select=id`, {
               headers: { 'apikey': supabaseAnonKey, 'Authorization': `Bearer ${token}` }
             });
             if (clientRes.ok) {
@@ -1110,7 +1131,7 @@ ${proposalPricingText}
               }
             }
             if (!clientId) {
-              const createClientRes = await fetch(`${supabaseUrl}/rest/v1/clients`, {
+              const createClientRes = await fetch(`${restBaseUrl}/rest/v1/clients`, {
                 method: 'POST',
                 headers: {
                   'Content-Type': 'application/json',
@@ -1133,58 +1154,49 @@ ${proposalPricingText}
             console.error("Failed fetching/creating client:", clientErr);
           }
 
-          // 1. Create dummy estimate to satisfy foreign keys and hold the total_amount
-          const estimateRes = await fetch(`${supabaseUrl}/rest/v1/estimates`, {
-            method: 'POST',
-            headers: {
-              'Content-Type': 'application/json',
-              'apikey': supabaseAnonKey,
-              'Authorization': `Bearer ${token}`,
-              'Prefer': 'return=representation'
-            },
-            body: JSON.stringify({
-              user_id: userId,
-              client_id: clientId || undefined,
-              status: 'sent',
-              total: proposalPricingTotal,
-              total_amount: proposalPricingTotal,
-              estimate_number: 'AI-' + Math.floor(1000 + Math.random() * 9000).toString(),
-              estimate_date: new Date().toISOString(),
-              nylas_grant_id: null
-            })
-          });
-
-          let estimateId = null;
-          if (estimateRes.ok) {
-            const estimateData = await estimateRes.json();
-            estimateId = estimateData[0]?.id;
-            console.log("Dummy estimate created successfully:", estimateId);
-          } else {
-            const dummyErr = await estimateRes.text();
-            console.error("Failed to create dummy estimate:", dummyErr);
-            throw new Error("Failed to create estimate record");
-          }
-
-          if (estimateId && clientId) {
-            // Upload PDF to S3
+          if (clientId) {
+            // 1. Upload PDF to S3 first
+            const estimateNum = 'AI-' + Math.floor(1000 + Math.random() * 9000).toString();
             const pdfBlob = doc.output('blob');
-            const pdfFile = new window.File([pdfBlob], `estimate_${estimateId}.pdf`, { type: 'application/pdf' });
+            const pdfFile = new window.File([pdfBlob], `estimate_${estimateNum}.pdf`, { type: 'application/pdf' });
             
             const s3Path = await S3UploadService.uploadFileInChunks(pdfFile, undefined, 'paybue-invoice-estimation/estimates');
             const publicUrl = S3UploadService.getPublicUrl(s3Path, 'paybue-invoice-estimation/estimates');
-            
-            // Update dummy estimate with document_url
-            await fetch(`${supabaseUrl}/rest/v1/estimates?id=eq.${estimateId}`, {
-              method: 'PATCH',
+
+            // 2. Create estimate with document_url pre-populated (eliminates separate PATCH request and CORS issues)
+            const estimateRes = await fetch(`${restBaseUrl}/rest/v1/estimates`, {
+              method: 'POST',
               headers: {
                 'Content-Type': 'application/json',
                 'apikey': supabaseAnonKey,
-                'Authorization': `Bearer ${token}`
+                'Authorization': `Bearer ${token}`,
+                'Prefer': 'return=representation'
               },
-              body: JSON.stringify({ document_url: publicUrl })
+              body: JSON.stringify({
+                user_id: userId,
+                client_id: clientId,
+                status: 'sent',
+                total: proposalPricingTotal,
+                total_amount: proposalPricingTotal,
+                estimate_number: estimateNum,
+                estimate_date: new Date().toISOString(),
+                document_url: publicUrl,
+                nylas_grant_id: null
+              })
             });
 
-            // Call the same backend endpoint used by standard estimates
+            let estimateId = null;
+            if (estimateRes.ok) {
+              const estimateData = await estimateRes.json();
+              estimateId = estimateData[0]?.id;
+              console.log("Estimate created successfully with document_url:", estimateId);
+            } else {
+              const dummyErr = await estimateRes.text();
+              console.error("Failed to create estimate:", dummyErr);
+              throw new Error("Failed to create estimate record");
+            }
+
+            // 3. Call the backend endpoint used by standard estimates to send email
             const emailPayload = {
               estimate_id: estimateId,
               template_id: 1, // Default fallback
@@ -1205,7 +1217,7 @@ ${proposalPricingText}
             });
             console.log("Successfully sent email via backend template endpoint");
           } else {
-            throw new Error("Missing estimate ID or client ID to send email");
+            throw new Error("Missing client ID to send email");
           }
         } else {
           console.error("Could not find userId or token to create tracking sequence");
@@ -1725,22 +1737,44 @@ ${proposalPricingText}
                           };
                         }
 
-                        // Make API call to fetch proposal template data via secure gateway
+                        // Make API call to fetch proposal template data via secure gateway with fallback
                         const gatewayQuoteUrl = `${import.meta.env.VITE_SUPABASE_URL || 'https://xwaxvkmqqgmpuivylhym.supabase.co'}/functions/v1/blueprint-estimate/quote`;
+                        const directQuoteUrl = `${import.meta.env.VITE_FASTAPI_URL || 'https://paybue-quee.hnhsofttechsolutions.com'}/quote`;
                         const quoteToken = authToken || localStorage.getItem('access_token');
-                        const response = await fetch(gatewayQuoteUrl, {
-                          method: 'POST',
-                          headers: {
-                            'Content-Type': 'application/json',
-                            'apikey': import.meta.env.VITE_SUPABASE_ANON_KEY || '',
-                            ...(quoteToken ? { 'Authorization': `Bearer ${quoteToken}` } : {})
-                          },
-                          body: JSON.stringify({
-                            status: true,
-                            estimate_text: markdown,
-                            tables_json: finalTablesJson
-                          })
-                        });
+                        const quotePayload = {
+                          status: true,
+                          estimate_text: markdown,
+                          tables_json: finalTablesJson
+                        };
+
+                        let response: Response;
+                        try {
+                          response = await fetch(gatewayQuoteUrl, {
+                            method: 'POST',
+                            headers: {
+                              'Content-Type': 'application/json',
+                              'apikey': import.meta.env.VITE_SUPABASE_ANON_KEY || '',
+                              ...(quoteToken ? { 'Authorization': `Bearer ${quoteToken}` } : {})
+                            },
+                            body: JSON.stringify(quotePayload)
+                          });
+
+                          if (!response.ok) {
+                            console.warn(`[GENERATE PROPOSAL] Gateway returned status ${response.status}, attempting fallback to direct service...`);
+                            response = await fetch(directQuoteUrl, {
+                              method: 'POST',
+                              headers: { 'Content-Type': 'application/json' },
+                              body: JSON.stringify(quotePayload)
+                            });
+                          }
+                        } catch (gatewayErr) {
+                          console.warn('[GENERATE PROPOSAL] Gateway request failed, attempting fallback to direct service...', gatewayErr);
+                          response = await fetch(directQuoteUrl, {
+                            method: 'POST',
+                            headers: { 'Content-Type': 'application/json' },
+                            body: JSON.stringify(quotePayload)
+                          });
+                        }
 
                         if (!response.ok) {
                           throw new Error(`API returned status ${response.status}`);
